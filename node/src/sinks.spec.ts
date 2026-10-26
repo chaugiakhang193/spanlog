@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { jsonSink, pinoSink, prettySink } from './sinks.js';
 import type { Rendered } from './types.js';
 
-const LINE: Rendered = {
+const RENDERED: Rendered = {
   time: new Date('2026-10-24T14:15:03.120Z'),
   level: 'error',
   msg: 'send | FAILED 2ms Error: x',
@@ -12,22 +12,22 @@ const LINE: Rendered = {
 
 describe('prettySink', () => {
   it('writes the readable lines of one event in one write', () => {
-    const write = vi.fn();
+    const writeText = vi.fn();
 
-    prettySink(write).write(LINE);
+    prettySink(writeText).write(RENDERED);
 
-    expect(write).toHaveBeenCalledTimes(1);
-    expect(write).toHaveBeenCalledWith('main line\n    at a\n');
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledWith('main line\n    at a\n');
   });
 });
 
 describe('jsonSink', () => {
   it('writes time, level, fields and msg in that order', () => {
-    const write = vi.fn();
+    const writeText = vi.fn();
 
-    jsonSink(write).write(LINE);
+    jsonSink(writeText).write(RENDERED);
 
-    expect(write).toHaveBeenCalledWith(
+    expect(writeText).toHaveBeenCalledWith(
       '{"time":"2026-10-24T14:15:03.120Z","level":"error","service":"shop",' +
         '"phase":"FAILED","ms":2,"params":{"id":"7"},' +
         '"msg":"send | FAILED 2ms Error: x"}\n',
@@ -44,9 +44,9 @@ describe('pinoSink', () => {
       error: vi.fn(),
     };
 
-    pinoSink(logger).write(LINE);
+    pinoSink(logger).write(RENDERED);
 
-    expect(logger.error).toHaveBeenCalledWith(LINE.fields, LINE.msg);
+    expect(logger.error).toHaveBeenCalledWith(RENDERED.fields, RENDERED.msg);
     expect(logger.info).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,8 @@
 import type { Rendered } from './types.js';
 
-/** SpanSink receives every rendered line that passes the level filter. */
+/** SpanSink receives every rendered event that passes the level filter. */
 export interface SpanSink {
-  write(line: Rendered): void;
+  write(rendered: Rendered): void;
 }
 
 export type TextWriter = (text: string) => void;
@@ -12,10 +12,10 @@ function writeStdout(text: string): void {
 }
 
 /** prettySink writes the readable lines, one event per write. */
-export function prettySink(write: TextWriter = writeStdout): SpanSink {
+export function prettySink(writeText: TextWriter = writeStdout): SpanSink {
   return {
-    write(line) {
-      write(`${line.lines.join('\n')}\n`);
+    write(rendered) {
+      writeText(`${rendered.lines.join('\n')}\n`);
     },
   };
 }
@@ -24,16 +24,16 @@ export function prettySink(write: TextWriter = writeStdout): SpanSink {
  * jsonSink writes one JSON object per line: time in UTC, level, the fields of
  * docs/log-format.md, then msg.
  */
-export function jsonSink(write: TextWriter = writeStdout): SpanSink {
+export function jsonSink(writeText: TextWriter = writeStdout): SpanSink {
   return {
-    write(line) {
+    write(rendered) {
       const record = {
-        time: line.time.toISOString(),
-        level: line.level,
-        ...line.fields,
-        msg: line.msg,
+        time: rendered.time.toISOString(),
+        level: rendered.level,
+        ...rendered.fields,
+        msg: rendered.msg,
       };
-      write(`${JSON.stringify(record, bigintAsString)}\n`);
+      writeText(`${JSON.stringify(record, bigintAsString)}\n`);
     },
   };
 }
@@ -56,8 +56,8 @@ export interface PinoLike {
  */
 export function pinoSink(logger: PinoLike): SpanSink {
   return {
-    write(line) {
-      logger[line.level](line.fields, line.msg);
+    write(rendered) {
+      logger[rendered.level](rendered.fields, rendered.msg);
     },
   };
 }

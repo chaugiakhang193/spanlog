@@ -4,6 +4,9 @@ import { redact } from './redact.js';
 import { stableJson } from './render.js';
 import type { ErrorInfo } from './types.js';
 
+// NonError is the err.name of a thrown value that is not an Error, such as a
+// plain object or a function. The call still ends with FAILED. UNREADABLE
+// stands in when reading the thrown value throws, for an Error as well.
 const UNREADABLE: ErrorInfo = {
   name: 'NonError',
   message: '[unreadable thrown value]',
@@ -42,13 +45,13 @@ export function describeThrown(value: unknown): string {
 // runs its getters. A getter that throws leaves UNREADABLE as the description.
 export function errorInfo(failure: object, redactKeys: string[]): ErrorInfo {
   try {
-    return describe(failure, redactKeys);
+    return readErrorInfo(failure, redactKeys);
   } catch {
     return { ...UNREADABLE };
   }
 }
 
-function describe(failure: object, redactKeys: string[]): ErrorInfo {
+function readErrorInfo(failure: object, redactKeys: string[]): ErrorInfo {
   if (isError(failure)) {
     const info: ErrorInfo = { name: failure.name, message: failure.message };
     if (failure.stack !== undefined) {
@@ -69,18 +72,22 @@ function describe(failure: object, redactKeys: string[]): ErrorInfo {
 }
 
 // An Error created in another realm, such as a vm context, fails instanceof
-// Error. Error.isError and util.types.isNativeError both recognise it. Node docs deprecate util.types.isNativeError since 24.2.0. It serves
-// runtimes that lack Error.isError.
-const isNativeError: (value: unknown) => boolean =
+// Error. Error.isError and util.types.isNativeError both recognise it. Node docs
+// deprecate util.types.isNativeError since 24.2.0. It serves runtimes that lack
+// Error.isError.
+const runtimeIsError: (value: unknown) => boolean =
   (Error as { isError?: (value: unknown) => boolean }).isError ??
   types.isNativeError;
 
 function isError(value: object): value is Error {
-  return value instanceof Error || isNativeError(value);
+  return value instanceof Error || runtimeIsError(value);
 }
 
-/** firstReportIn records failure in request and tells whether it is new there. */
-export function firstReportIn(request: RequestScope, failure: object): boolean {
+/**
+ * markReported marks failure as reported in request. It returns true when
+ * failure was not marked there before.
+ */
+export function markReported(request: RequestScope, failure: object): boolean {
   if (request.reported.has(failure)) {
     return false;
   }

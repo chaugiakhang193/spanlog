@@ -151,7 +151,7 @@ function errorFields(event: SpanEvent, err: ErrorInfo): ErrorInfo {
   const fields: ErrorInfo = err.name
     ? { name: err.name, message: err.message }
     : { message: err.message };
-  if (carriesStack(event) && err.stack !== undefined) {
+  if (isFirstReportOnFrameLine(event) && err.stack !== undefined) {
     fields.stack = err.stack;
   }
   return fields;
@@ -159,7 +159,7 @@ function errorFields(event: SpanEvent, err: ErrorInfo): ErrorInfo {
 
 // Only the first report of an error on a frame line carries the stack. Frames
 // further out and failed SQL statements repeat the name and message only.
-function carriesStack(event: SpanEvent): boolean {
+function isFirstReportOnFrameLine(event: SpanEvent): boolean {
   return (
     event.firstReport === true &&
     (event.action === 'run' || event.action === 'call')
@@ -188,7 +188,7 @@ function stackLines(
   stackFilter: RenderOptions['stackFilter'],
 ): string[] {
   const stack = event.err?.stack;
-  if (!carriesStack(event) || stack === undefined) {
+  if (!isFirstReportOnFrameLine(event) || stack === undefined) {
     return [];
   }
   const lines = stack
@@ -247,7 +247,7 @@ function encode(value: unknown): string | undefined {
   if (Array.isArray(value)) {
     return `[${value.map((item) => encode(item) ?? 'null').join(',')}]`;
   }
-  if (isPlainRecord(value)) {
+  if (isObjectWithoutToJSONMethod(value)) {
     const parts: string[] = [];
     for (const key of Object.keys(value).sort()) {
       const encoded = encode(value[key]);
@@ -261,7 +261,9 @@ function encode(value: unknown): string | undefined {
   return JSON.stringify(value) as string | undefined;
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
+function isObjectWithoutToJSONMethod(
+  value: unknown,
+): value is Record<string, unknown> {
   return (
     typeof value === 'object' &&
     value !== null &&

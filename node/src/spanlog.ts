@@ -2,13 +2,14 @@ import {
   currentContext,
   newRequestScope,
   spanlogRunInContext,
+  type Frame,
   type RequestScope,
   type SpanContext,
 } from './context.js';
 import {
   describeThrown,
   errorInfo,
-  firstReportIn,
+  markReported,
   toFailure,
 } from './failure.js';
 import { withoutOwnFrames } from './frames.js';
@@ -78,6 +79,12 @@ const LEVEL_RANK: Record<Level, number> = {
 
 type AsyncMethod = (...args: unknown[]) => Promise<unknown>;
 
+/**
+ * Owner is the part of a line that names who writes it and what it is about.
+ * scope and method belong to the frame that owns the line. For a wrapped
+ * method called from another wrapped method that frame is the caller, and
+ * target names the callee.
+ */
 interface Owner {
   scope?: string;
   method?: string;
@@ -86,7 +93,8 @@ interface Owner {
   sameScope?: boolean;
 }
 
-type LineEvent = Omit<SpanEvent, 'time' | 'service'>;
+// UnstampedEvent is a SpanEvent before emit adds the time and the service.
+type UnstampedEvent = Omit<SpanEvent, 'time' | 'service'>;
 
 // tracedTargets is shared by every Spanlog instance. An object traced by two
 // instances would otherwise write every line twice.
@@ -107,8 +115,8 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
   const fixedOffsetMinutes = options.utcOffsetMinutes;
   const redactKeys = options.redactKeys ?? [];
 
-  function emit(line: LineEvent): void {
-    const event: SpanEvent = { ...line, time: new Date(), service };
+  function emit(unstamped: UnstampedEvent): void {
+    const event: SpanEvent = { ...unstamped, time: new Date(), service };
     if (LEVEL_RANK[levelFor(event)] < minRank) {
       return;
     }
@@ -126,7 +134,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     }
   }
 
-  function safeRecord(
+  function redactRecord(
     value: Record<string, unknown> | undefined,
   ): Record<string, unknown> | undefined {
     if (value === undefined) {
@@ -138,7 +146,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
   async function spanlogTrack<T>(
     owner: Owner,
     request: RequestScope,
-    run: () => T | Promise<T>,
+    fn: () => T | Promise<T>,
     callOptions?: CallOptions<T>,
   ): Promise<T> {
     const reqId = request.reqId;
@@ -146,12 +154,12 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
       ...owner,
       reqId,
       phase: 'START',
-      params: paramsLine(owner, callOptions),
+      params: paramsForEvent(owner, callOptions),
     });
     const startedAt = performance.now();
     let result: T;
     try {
-      result = await run();
+      result = await fn();
     } catch (thrown) {
       const failure = toFailure(thrown);
       emit({
@@ -160,7 +168,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
         phase: 'FAILED',
         durationMs: performance.now() - startedAt,
         err: errorInfo(failure, redactKeys),
-        firstReport: firstReportIn(request, failure),
+        firstReport: markReported(request, failure),
       });
       throw failure;
     }
@@ -170,17 +178,17 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
       reqId,
       phase: durationMs > slowMs ? 'SLOW' : 'DONE',
       durationMs,
-      summary: summaryLine(owner, result, callOptions),
+      summary: summaryForEvent(owner, result, callOptions),
     });
     return result;
   }
 
-  function paramsLine<T>(
+  function paramsForEvent<T>(
     owner: Owner,
     callOptions: CallOptions<T> | undefined,
   ): Record<string, unknown> | undefined {
     try {
-      return safeRecord(callOptions?.params);
+      return redactRecord(callOptions?.params);
     } catch (failure) {
       // Reading params runs their getters. A getter that throws must not stop
       // the call from running.
@@ -192,7 +200,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     }
   }
 
-  function summaryLine<T>(
+  function summaryForEvent<T>(
     owner: Owner,
     result: T,
     callOptions: CallOptions<T> | undefined,
@@ -201,7 +209,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
       return undefined;
     }
     try {
-      return safeRecord(summaryOf(result, callOptions));
+      return redactRecord(summaryOf(result, callOptions));
     } catch (failure) {
       // A summarize function that throws must not fail a call that succeeded.
       process.emitWarning(
@@ -227,8 +235,9 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     ): Promise<unknown> {
       const parent = currentContext();
       const request = parent?.request ?? newRequestScope(undefined);
-      const context: SpanContext = { request, frame: { scope, method } };
-      const owner = ownerOf(parent, scope, method);
+      const callee: Frame = { scope, method };
+      const context: SpanContext = { request, frame: callee };
+      const owner = ownerOf(parent, callee);
       const spanlogInvoke = () => original.apply(this, args);
       const spanlogEnter = () => spanlogTrack(owner, request, spanlogInvoke);
       return spanlogRunInContext(context, spanlogEnter);
@@ -286,22 +295,18 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
 
 // ownerOf decides whose line a wrapped call writes. Inside another wrapped
 // method the line belongs to the caller and names the callee as target.
-// Otherwise the method writes a run line in its own scope.
-function ownerOf(
-  parent: SpanContext | undefined,
-  scope: string,
-  method: string,
-): Owner {
+// Otherwise the callee writes a run line in its own scope.
+function ownerOf(parent: SpanContext | undefined, callee: Frame): Owner {
   const caller = parent?.frame;
   if (caller === undefined) {
-    return { scope, method, action: 'run' };
+    return { scope: callee.scope, method: callee.method, action: 'run' };
   }
   return {
     scope: caller.scope,
     method: caller.method,
     action: 'call',
-    target: `${scope}.${method}`,
-    sameScope: caller.scope === scope,
+    target: `${callee.scope}.${callee.method}`,
+    sameScope: caller.scope === callee.scope,
   };
 }
 

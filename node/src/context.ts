@@ -8,7 +8,8 @@ export interface Frame {
 
 /**
  * RequestScope is shared by every line written while one request runs.
- * reported holds the errors already written with their stack in it.
+ * reported holds the errors already marked as reported in the request. A
+ * failure is marked before its line reaches the level filter and the sink.
  */
 export interface RequestScope {
   reqId: string | undefined;

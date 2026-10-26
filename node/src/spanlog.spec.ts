@@ -11,19 +11,19 @@ import type { ErrorInfo, Rendered } from './types.js';
 const MS = /\d+(\.\d+)?ms/;
 
 function setup(options: Partial<SpanlogOptions> = {}) {
-  const lines: Rendered[] = [];
+  const written: Rendered[] = [];
   const spanlog = createSpanlog({
     service: 'shop',
-    sink: { write: (line) => lines.push(line) },
+    sink: { write: (rendered) => written.push(rendered) },
     utcOffsetMinutes: 0,
     ...options,
   });
-  return { spanlog, lines };
+  return { spanlog, written };
 }
 
 // shape hides the measured duration, which changes from run to run.
-function shape(line: Rendered): string {
-  return line.msg.replace(MS, 'Nms');
+function shape(rendered: Rendered): string {
+  return rendered.msg.replace(MS, 'Nms');
 }
 
 function delay(ms: number): Promise<void> {
@@ -78,7 +78,7 @@ afterEach(() => {
 
 describe('traced', () => {
   it('writes a run pair carrying the request id', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const inventory = spanlog.traced(
       new InventoryService(),
       'InventoryService',
@@ -86,28 +86,28 @@ describe('traced', () => {
 
     await spanlog.withRequest('r-1', () => inventory.reserve('A1'));
 
-    expect(lines.map(shape)).toEqual([
+    expect(written.map(shape)).toEqual([
       'InventoryService.reserve - run | START',
       'InventoryService.reserve - run | DONE Nms',
     ]);
-    expect(lines[0]?.fields).toMatchObject({
+    expect(written[0]?.fields).toMatchObject({
       reqId: 'r-1',
       scope: 'InventoryService',
       method: 'reserve',
       action: 'run',
     });
-    expect(lines[0]?.lines[0]).toMatch(
+    expect(written[0]?.lines[0]).toMatch(
       / INFO {2}\[shop\] \[InventoryService\.reserve\] req=r-1 run \| START$/,
     );
   });
 
   it('writes nested calls in the frame of the caller', async () => {
-    const { spanlog, lines } = setup({ level: 'debug' });
+    const { spanlog, written } = setup({ level: 'debug' });
     const order = wireOrder(spanlog);
 
     await spanlog.withRequest('r-2', () => order.handleOrder('A1'));
 
-    expect(lines.map((l) => `${l.level} ${shape(l)}`)).toEqual([
+    expect(written.map((l) => `${l.level} ${shape(l)}`)).toEqual([
       'info OrderService.handleOrder - run | START',
       'debug OrderService.handleOrder - call OrderService.validate | START',
       'debug OrderService.handleOrder - call OrderService.validate | DONE Nms',
@@ -120,13 +120,15 @@ describe('traced', () => {
   });
 
   it('hides calls within one scope at the default level', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const order = wireOrder(spanlog);
 
     await spanlog.withRequest('r-3', () => order.handleOrder('A1'));
 
-    expect(lines.some((line) => line.msg.includes('validate'))).toBe(false);
-    expect(lines).toHaveLength(6);
+    expect(written.some((rendered) => rendered.msg.includes('validate'))).toBe(
+      false,
+    );
+    expect(written).toHaveLength(6);
   });
 
   it('keeps the frame of each branch of a Promise.all', async () => {
@@ -156,7 +158,7 @@ describe('traced', () => {
         await Promise.all([this.inventory.reserve(), this.payment.charge()]);
       }
     }
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const audit = spanlog.traced(new AuditLog(), 'AuditLog');
     const checkout = spanlog.traced(new Checkout(), 'Checkout');
     checkout.inventory = spanlog.traced(
@@ -169,7 +171,7 @@ describe('traced', () => {
 
     await spanlog.withRequest('r-4', () => checkout.run());
 
-    const auditOwners = lines
+    const auditOwners = written
       .filter(
         (l) =>
           l.fields.target === 'AuditLog.write' && l.fields.phase === 'START',
@@ -192,7 +194,7 @@ describe('traced', () => {
         return Promise.resolve(1);
       }
     }
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const order = spanlog.traced(new OrderService(), 'OrderService');
     const mixed = spanlog.traced(new Mixed(), 'Mixed');
 
@@ -200,19 +202,19 @@ describe('traced', () => {
     expect(Object.hasOwn(order, 'total')).toBe(false);
     expect(reads).toBe(0);
     await mixed.legacy();
-    expect(lines).toHaveLength(0);
+    expect(written).toHaveLength(0);
   });
 
   it('wraps async arrow functions held as fields', async () => {
     class Loader {
       load = async (): Promise<number> => 1;
     }
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const loader = spanlog.traced(new Loader(), 'Loader');
 
     await loader.load();
 
-    expect(lines.map(shape)).toEqual([
+    expect(written.map(shape)).toEqual([
       'Loader.load - run | START',
       'Loader.load - run | DONE Nms',
     ]);
@@ -229,16 +231,16 @@ describe('traced', () => {
         return Promise.resolve(2);
       }
     }
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const child = spanlog.traced(new Child(), 'Child');
 
     await child.go();
 
-    expect(lines).toHaveLength(0);
+    expect(written).toHaveLength(0);
   });
 
   it('does nothing when the same object is traced twice', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const inventory = spanlog.traced(
       new InventoryService(),
       'InventoryService',
@@ -247,7 +249,7 @@ describe('traced', () => {
 
     await inventory.reserve('A1');
 
-    expect(lines).toHaveLength(2);
+    expect(written).toHaveLength(2);
   });
 
   it('ends a slow call with SLOW at warn', async () => {
@@ -256,17 +258,17 @@ describe('traced', () => {
         await delay(10);
       }
     }
-    const { spanlog, lines } = setup({ slowMs: 1 });
+    const { spanlog, written } = setup({ slowMs: 1 });
     const slow = spanlog.traced(new Slow(), 'Slow');
 
     await slow.wait();
 
-    expect(lines[1]?.fields.phase).toBe('SLOW');
-    expect(lines[1]?.level).toBe('warn');
+    expect(written[1]?.fields.phase).toBe('SLOW');
+    expect(written[1]?.level).toBe('warn');
   });
 
   it('writes lines outside a request without reqId', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const inventory = spanlog.traced(
       new InventoryService(),
       'InventoryService',
@@ -274,8 +276,8 @@ describe('traced', () => {
 
     await inventory.reserve('A1');
 
-    expect(lines[0]?.fields.reqId).toBeUndefined();
-    expect(lines[0]?.lines[0]).toContain(
+    expect(written[0]?.fields.reqId).toBeUndefined();
+    expect(written[0]?.lines[0]).toContain(
       ' [shop] [InventoryService.reserve] req=- run | START',
     );
   });
@@ -308,14 +310,14 @@ describe('errors', () => {
 
   it('reports an error with its stack once and rethrows the same object', async () => {
     const boom = new Error('stock not available');
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const outer = wireChain(spanlog, boom);
 
     await expect(spanlog.withRequest('r-5', () => outer.run())).rejects.toBe(
       boom,
     );
 
-    const failed = lines.filter((l) => l.fields.phase === 'FAILED');
+    const failed = written.filter((l) => l.fields.phase === 'FAILED');
     expect(failed.map((l) => `${l.level} ${shape(l)}`)).toEqual([
       'error Middle.step - call Inner.fail | FAILED Nms Error: stock not available',
       'info Outer.run - call Middle.step | FAILED Nms Error: stock not available',
@@ -336,7 +338,7 @@ describe('errors', () => {
 
   it('reports the same error object once in each request', async () => {
     const shared = new Error('shared');
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const outer = wireChain(spanlog, shared);
 
     await Promise.allSettled([
@@ -344,12 +346,12 @@ describe('errors', () => {
       spanlog.withRequest('b', () => outer.run()),
     ]);
 
-    const errors = lines.filter((l) => l.level === 'error');
+    const errors = written.filter((l) => l.level === 'error');
     expect(errors.map((l) => l.fields.reqId).sort()).toEqual(['a', 'b']);
   });
 
   it('wraps a thrown string in an Error and rethrows the wrapper', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const outer = wireChain(spanlog, 'plain text');
 
     const outcome = spanlog.withRequest('r-6', () => outer.run());
@@ -359,16 +361,16 @@ describe('errors', () => {
       message: 'plain text',
       cause: 'plain text',
     });
-    expect(lines.filter((l) => l.level === 'error')).toHaveLength(1);
+    expect(written.filter((l) => l.level === 'error')).toHaveLength(1);
   });
 
   it('describes a thrown plain object by its redacted JSON', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const outer = wireChain(spanlog, { code: 'E1', token: 't' });
 
     await expect(outer.run()).rejects.toEqual({ code: 'E1', token: 't' });
 
-    expect(lines.find((l) => l.level === 'error')?.fields.err).toEqual({
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
       name: 'NonError',
       message: '{"code":"E1","token":"[REDACTED]"}',
     });
@@ -382,12 +384,12 @@ describe('errors', () => {
         throw new Error('getter failed');
       },
     });
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const outer = wireChain(spanlog, thrown);
 
     await expect(outer.run()).rejects.toBe(thrown);
 
-    expect(lines.find((l) => l.level === 'error')?.fields.err).toEqual({
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
       name: 'NonError',
       message: '[unreadable thrown value]',
     });
@@ -397,12 +399,12 @@ describe('errors', () => {
     const foreign = runInNewContext('new RangeError("realm failure")') as {
       stack: string;
     };
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const outer = wireChain(spanlog, foreign);
 
     await expect(outer.run()).rejects.toBe(foreign);
 
-    expect(lines.find((l) => l.level === 'error')?.fields.err).toEqual({
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
       name: 'RangeError',
       message: 'realm failure',
       stack: foreign.stack,
@@ -410,14 +412,14 @@ describe('errors', () => {
   });
 
   it('keeps counting reports when the level hides the outer lines', async () => {
-    const { spanlog, lines } = setup({ level: 'error' });
+    const { spanlog, written } = setup({ level: 'error' });
     const outer = wireChain(spanlog, new Error('x'));
 
     await expect(spanlog.withRequest('r-7', () => outer.run())).rejects.toThrow(
       'x',
     );
 
-    expect(lines.map(shape)).toEqual([
+    expect(written.map(shape)).toEqual([
       'Middle.step - call Inner.fail | FAILED Nms Error: x',
     ]);
   });
@@ -428,22 +430,22 @@ describe('readable stack', () => {
   // whatever form the runner prints the path in.
   const OWN_LOCATION = /[\\/]src[\\/](spanlog|context)\.ts:\d+/;
 
-  function firstReport(lines: Rendered[]): Rendered {
-    const line = lines.find((l) => l.level === 'error');
-    if (line === undefined) {
+  function firstReport(written: Rendered[]): Rendered {
+    const rendered = written.find((l) => l.level === 'error');
+    if (rendered === undefined) {
       throw new Error('no error line written');
     }
-    return line;
+    return rendered;
   }
 
-  function expectOwnFramesHidden(line: Rendered): void {
-    const readable = line.lines.slice(1);
+  function expectOwnFramesHidden(rendered: Rendered): void {
+    const readable = rendered.lines.slice(1);
     expect(readable.filter((l) => OWN_LOCATION.test(l))).toEqual([]);
     expect(readable.some((l) => l.includes('AsyncLocalStorage.run'))).toBe(
       false,
     );
     expect(readable.some((l) => l.includes('spanlog.spec.ts'))).toBe(true);
-    expect((line.fields.err as ErrorInfo).stack).toMatch(OWN_LOCATION);
+    expect((rendered.fields.err as ErrorInfo).stack).toMatch(OWN_LOCATION);
   }
 
   it('hides spanlog frames of an error thrown after an await', async () => {
@@ -453,14 +455,14 @@ describe('readable stack', () => {
         throw new Error('after await');
       }
     }
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const inner = spanlog.traced(new Inner(), 'Inner');
 
     await expect(
       spanlog.withRequest('r-10', () => inner.fail()),
     ).rejects.toThrow('after await');
 
-    expectOwnFramesHidden(firstReport(lines));
+    expectOwnFramesHidden(firstReport(written));
   });
 
   it('hides spanlog frames of an error thrown before the first await', async () => {
@@ -469,18 +471,18 @@ describe('readable stack', () => {
         throw new Error('before await');
       }
     }
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const inner = spanlog.traced(new Inner(), 'Inner');
 
     await expect(
       spanlog.withRequest('r-11', () => inner.fail()),
     ).rejects.toThrow('before await');
 
-    expectOwnFramesHidden(firstReport(lines));
+    expectOwnFramesHidden(firstReport(written));
   });
 
   it('hides spanlog frames of an error thrown inside an explicit call', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
 
     await expect(
       spanlog.withRequest('r-12', () =>
@@ -490,7 +492,7 @@ describe('readable stack', () => {
       ),
     ).rejects.toThrow('in call');
 
-    expectOwnFramesHidden(firstReport(lines));
+    expectOwnFramesHidden(firstReport(written));
   });
 
   it('keeps the frame of an application method named with the spanlog prefix', async () => {
@@ -499,19 +501,19 @@ describe('readable stack', () => {
         throw new Error('bad input');
       }
     }
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const parser = spanlog.traced(new Parser(), 'Parser');
 
     await expect(parser.spanlogParse()).rejects.toThrow('bad input');
 
-    const readable = firstReport(lines).lines.slice(1);
+    const readable = firstReport(written).lines.slice(1);
     expect(readable.some((l) => l.includes('Parser.spanlogParse'))).toBe(true);
   });
 });
 
 describe('call', () => {
   it('writes redacted params and counts an array result', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
 
     const rows = await spanlog.withRequest('r-8', () =>
       spanlog.call('repo.findOrders', async () => [1, 2, 3], {
@@ -520,14 +522,14 @@ describe('call', () => {
     );
 
     expect(rows).toEqual([1, 2, 3]);
-    expect(lines.map(shape)).toEqual([
+    expect(written.map(shape)).toEqual([
       'call repo.findOrders | START {"customerId":"c-1","password":"[REDACTED]"}',
       'call repo.findOrders | DONE Nms {"count":3}',
     ]);
   });
 
   it('writes the call in the frame of the wrapped method around it', async () => {
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     class Repo {
       async find(): Promise<string> {
         return spanlog.call('db.find', async () => 'row');
@@ -537,7 +539,7 @@ describe('call', () => {
 
     await repo.find();
 
-    expect(lines.map(shape)).toEqual([
+    expect(written.map(shape)).toEqual([
       'Repo.find - run | START',
       'Repo.find - call db.find | START',
       'Repo.find - call db.find | DONE Nms',
@@ -547,7 +549,7 @@ describe('call', () => {
 
   it('shares reported errors with wrapped methods outside a request', async () => {
     const boom = new Error('x');
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     class Inner {
       async fail(): Promise<void> {
         throw boom;
@@ -559,14 +561,14 @@ describe('call', () => {
       boom,
     );
 
-    expect(lines.filter((l) => l.level === 'error').map(shape)).toEqual([
+    expect(written.filter((l) => l.level === 'error').map(shape)).toEqual([
       'Inner.fail - run | FAILED Nms Error: x',
     ]);
   });
 
   it('keeps the result when summarize throws', async () => {
     const warn = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
 
     const value = await spanlog.call('x.y', async () => 1, {
       summarize: () => {
@@ -575,7 +577,7 @@ describe('call', () => {
     });
 
     expect(value).toBe(1);
-    expect(lines.map(shape)).toEqual([
+    expect(written.map(shape)).toEqual([
       'call x.y | START',
       'call x.y | DONE Nms',
     ]);
@@ -650,13 +652,13 @@ describe('call', () => {
         throw new Error('params getter failed');
       },
     });
-    const { spanlog, lines } = setup();
+    const { spanlog, written } = setup();
     const fn = vi.fn(async () => 1);
 
     await expect(spanlog.call('x.y', fn, { params })).resolves.toBe(1);
 
     expect(fn).toHaveBeenCalledOnce();
-    expect(lines.map(shape)).toEqual([
+    expect(written.map(shape)).toEqual([
       'call x.y | START',
       'call x.y | DONE Nms',
     ]);
@@ -670,10 +672,10 @@ describe('call', () => {
 
   it('reads utcOffsetMinutes once, when the Spanlog is created', async () => {
     let reads = 0;
-    const lines: Rendered[] = [];
+    const written: Rendered[] = [];
     const spanlog = createSpanlog({
       service: 'shop',
-      sink: { write: (line) => lines.push(line) },
+      sink: { write: (rendered) => written.push(rendered) },
       get utcOffsetMinutes() {
         reads += 1;
         if (reads > 1) {
@@ -692,7 +694,7 @@ describe('call', () => {
     ).rejects.toBe(boom);
 
     expect(reads).toBe(1);
-    expect(lines.map(shape)).toEqual([
+    expect(written.map(shape)).toEqual([
       'call x.y | START',
       'call x.y | DONE Nms',
       'call x.y | START',
@@ -718,8 +720,8 @@ describe('call', () => {
     const spanlog = createSpanlog({
       service: 'shop',
       sink: {
-        write(line) {
-          if (line.fields.phase === 'FAILED') {
+        write(rendered) {
+          if (rendered.fields.phase === 'FAILED') {
             throw Object.create(null);
           }
         },
