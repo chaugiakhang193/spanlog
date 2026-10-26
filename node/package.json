@@ -1,0 +1,40 @@
+{
+  "name": "spanlog",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Readable call-boundary logs for Node.js: START and DONE lines with timing, written to the application's own logger",
+  "license": "MIT",
+  "author": "chaugiakhang193",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chaugiakhang193/spanlog.git",
+    "directory": "node"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "format": "prettier --write \"src/**/*.ts\" \"*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"*.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}
