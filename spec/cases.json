@@ -1,0 +1,785 @@
+{
+  "version": 0,
+  "render": [
+    {
+      "name": "request start",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "POST /orders | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c POST /orders | START"
+        ]
+      }
+    },
+    {
+      "name": "run start",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - run | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c run | START"
+        ]
+      }
+    },
+    {
+      "name": "call to another scope starts at info",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "InventoryService.reserve",
+        "sameScope": false,
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - call InventoryService.reserve | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "InventoryService.reserve",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c call InventoryService.reserve | START"
+        ]
+      }
+    },
+    {
+      "name": "query done at debug with tables",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "InventoryService",
+        "method": "reserve",
+        "action": "query",
+        "target": "UPDATE warehouse.inventory",
+        "op": "UPDATE",
+        "tables": ["warehouse.inventory"],
+        "phase": "DONE",
+        "durationMs": 2.96
+      },
+      "expect": {
+        "level": "debug",
+        "msg": "InventoryService.reserve - query UPDATE warehouse.inventory | DONE 3ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "InventoryService",
+          "method": "reserve",
+          "action": "query",
+          "target": "UPDATE warehouse.inventory",
+          "phase": "DONE",
+          "ms": 3,
+          "op": "UPDATE",
+          "tables": ["warehouse.inventory"]
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 DEBUG [shop] [InventoryService.reserve] req=7f3a9c query UPDATE warehouse.inventory | DONE 3ms"
+        ]
+      }
+    },
+    {
+      "name": "call done rounds the duration",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "InventoryService.reserve",
+        "sameScope": false,
+        "phase": "DONE",
+        "durationMs": 4.96
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - call InventoryService.reserve | DONE 5ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "InventoryService.reserve",
+          "phase": "DONE",
+          "ms": 5
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c call InventoryService.reserve | DONE 5ms"
+        ]
+      }
+    },
+    {
+      "name": "slow call at warn",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "PaymentService.charge",
+        "sameScope": false,
+        "phase": "SLOW",
+        "durationMs": 801.04
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "OrderService.handleOrder - call PaymentService.charge | SLOW 801ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "PaymentService.charge",
+          "phase": "SLOW",
+          "ms": 801
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] [OrderService.handleOrder] req=7f3a9c call PaymentService.charge | SLOW 801ms"
+        ]
+      }
+    },
+    {
+      "name": "call within the same scope at debug",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "OrderService.validate",
+        "sameScope": true,
+        "phase": "DONE",
+        "durationMs": 0.42
+      },
+      "expect": {
+        "level": "debug",
+        "msg": "OrderService.handleOrder - call OrderService.validate | DONE 0.4ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "OrderService.validate",
+          "phase": "DONE",
+          "ms": 0.4
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 DEBUG [shop] [OrderService.handleOrder] req=7f3a9c call OrderService.validate | DONE 0.4ms"
+        ]
+      }
+    },
+    {
+      "name": "run done",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "DONE",
+        "durationMs": 819.96
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - run | DONE 820ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "DONE",
+          "ms": 820
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c run | DONE 820ms"
+        ]
+      }
+    },
+    {
+      "name": "request done with status",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "DONE",
+        "durationMs": 823.04,
+        "status": 201
+      },
+      "expect": {
+        "level": "info",
+        "msg": "POST /orders | DONE 201 823ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "DONE",
+          "ms": 823,
+          "status": 201
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c POST /orders | DONE 201 823ms"
+        ]
+      }
+    },
+    {
+      "name": "first report of an error carries the stack",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "InventoryService.reserve",
+        "sameScope": false,
+        "phase": "FAILED",
+        "durationMs": 3.04,
+        "firstReport": true,
+        "err": {
+          "name": "Error",
+          "message": "stock not available",
+          "stack": "Error: stock not available\n    at InventoryService.reserve (file:///app/src/inventory.service.js:12:11)\n    at async OrderService.handleOrder (file:///app/src/order.service.js:20:5)"
+        }
+      },
+      "expect": {
+        "level": "error",
+        "msg": "OrderService.handleOrder - call InventoryService.reserve | FAILED 3ms Error: stock not available",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "InventoryService.reserve",
+          "phase": "FAILED",
+          "ms": 3,
+          "err": {
+            "name": "Error",
+            "message": "stock not available",
+            "stack": "Error: stock not available\n    at InventoryService.reserve (file:///app/src/inventory.service.js:12:11)\n    at async OrderService.handleOrder (file:///app/src/order.service.js:20:5)"
+          }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 ERROR [shop] [OrderService.handleOrder] req=7f3a9c call InventoryService.reserve | FAILED 3ms Error: stock not available",
+          "    at InventoryService.reserve (file:///app/src/inventory.service.js:12:11)",
+          "    at async OrderService.handleOrder (file:///app/src/order.service.js:20:5)"
+        ]
+      }
+    },
+    {
+      "name": "outer frame of an error already reported",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "FAILED",
+        "durationMs": 30.04,
+        "firstReport": false,
+        "err": {
+          "name": "Error",
+          "message": "stock not available",
+          "stack": "Error: stock not available\n    at InventoryService.reserve (file:///app/src/inventory.service.js:12:11)"
+        }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - run | FAILED 30ms Error: stock not available",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "FAILED",
+          "ms": 30,
+          "err": { "name": "Error", "message": "stock not available" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c run | FAILED 30ms Error: stock not available"
+        ]
+      }
+    },
+    {
+      "name": "failed query at warn without stack",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "InventoryService",
+        "method": "reserve",
+        "action": "query",
+        "target": "UPDATE warehouse.inventory",
+        "op": "UPDATE",
+        "tables": ["warehouse.inventory"],
+        "phase": "FAILED",
+        "durationMs": 1.46,
+        "firstReport": true,
+        "err": {
+          "name": "QueryFailedError",
+          "message": "deadlock detected",
+          "stack": "QueryFailedError: deadlock detected\n    at PostgresQueryRunner.query (file:///app/node_modules/typeorm/index.js:1:1)"
+        }
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "InventoryService.reserve - query UPDATE warehouse.inventory | FAILED 1.5ms QueryFailedError: deadlock detected",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "InventoryService",
+          "method": "reserve",
+          "action": "query",
+          "target": "UPDATE warehouse.inventory",
+          "phase": "FAILED",
+          "ms": 1.5,
+          "op": "UPDATE",
+          "tables": ["warehouse.inventory"],
+          "err": { "name": "QueryFailedError", "message": "deadlock detected" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] [InventoryService.reserve] req=7f3a9c query UPDATE warehouse.inventory | FAILED 1.5ms QueryFailedError: deadlock detected"
+        ]
+      }
+    },
+    {
+      "name": "rollback at warn",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "InventoryService",
+        "method": "reserve",
+        "action": "query",
+        "target": "ROLLBACK",
+        "op": "ROLLBACK",
+        "tables": [],
+        "phase": "DONE",
+        "durationMs": 0.34
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "InventoryService.reserve - query ROLLBACK | DONE 0.3ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "InventoryService",
+          "method": "reserve",
+          "action": "query",
+          "target": "ROLLBACK",
+          "phase": "DONE",
+          "ms": 0.3,
+          "op": "ROLLBACK",
+          "tables": []
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] [InventoryService.reserve] req=7f3a9c query ROLLBACK | DONE 0.3ms"
+        ]
+      }
+    },
+    {
+      "name": "request failed with a 5xx status",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "FAILED",
+        "durationMs": 31.04,
+        "status": 500
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "POST /orders | FAILED 500 31ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "FAILED",
+          "ms": 31,
+          "status": 500
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] req=7f3a9c POST /orders | FAILED 500 31ms"
+        ]
+      }
+    },
+    {
+      "name": "request aborted by the client",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "ABORTED",
+        "durationMs": 12.04
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "POST /orders | ABORTED 12ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "ABORTED",
+          "ms": 12
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] req=7f3a9c POST /orders | ABORTED 12ms"
+        ]
+      }
+    },
+    {
+      "name": "line outside a request",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "scope": "ReportJob",
+        "method": "build",
+        "action": "run",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "ReportJob.build - run | START",
+        "fields": {
+          "service": "shop",
+          "scope": "ReportJob",
+          "method": "build",
+          "action": "run",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [ReportJob.build] req=- run | START"
+        ]
+      }
+    },
+    {
+      "name": "explicit call without a frame shows sorted params",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "call",
+        "target": "payments.charge",
+        "sameScope": false,
+        "phase": "START",
+        "params": { "orderId": "o-1", "amount": 120 }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call payments.charge | START {\"amount\":120,\"orderId\":\"o-1\"}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "call",
+          "target": "payments.charge",
+          "phase": "START",
+          "params": { "orderId": "o-1", "amount": 120 }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c call payments.charge | START {\"amount\":120,\"orderId\":\"o-1\"}"
+        ]
+      }
+    },
+    {
+      "name": "params keys are sorted at every level",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "call",
+        "target": "search.run",
+        "sameScope": false,
+        "phase": "START",
+        "params": { "b": { "z": 1, "a": 2 }, "a": [{ "y": 1, "x": 2 }] }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call search.run | START {\"a\":[{\"x\":2,\"y\":1}],\"b\":{\"a\":2,\"z\":1}}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "call",
+          "target": "search.run",
+          "phase": "START",
+          "params": { "b": { "z": 1, "a": 2 }, "a": [{ "y": 1, "x": 2 }] }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c call search.run | START {\"a\":[{\"x\":2,\"y\":1}],\"b\":{\"a\":2,\"z\":1}}"
+        ]
+      }
+    },
+    {
+      "name": "explicit call done with a summary",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "call",
+        "target": "repo.findOrders",
+        "sameScope": false,
+        "phase": "DONE",
+        "durationMs": 2.04,
+        "summary": { "count": 3 }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call repo.findOrders | DONE 2ms {\"count\":3}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "call",
+          "target": "repo.findOrders",
+          "phase": "DONE",
+          "ms": 2,
+          "summary": { "count": 3 }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c call repo.findOrders | DONE 2ms {\"count\":3}"
+        ]
+      }
+    },
+    {
+      "name": "error without a name",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "Mailer",
+        "method": "send",
+        "action": "run",
+        "phase": "FAILED",
+        "durationMs": 2.04,
+        "firstReport": true,
+        "err": { "message": "connection refused" }
+      },
+      "expect": {
+        "level": "error",
+        "msg": "Mailer.send - run | FAILED 2ms connection refused",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "Mailer",
+          "method": "send",
+          "action": "run",
+          "phase": "FAILED",
+          "ms": 2,
+          "err": { "message": "connection refused" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 ERROR [shop] [Mailer.send] req=7f3a9c run | FAILED 2ms connection refused"
+        ]
+      }
+    },
+    {
+      "name": "negative offset",
+      "options": { "utcOffsetMinutes": -300 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "POST /orders | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 09:15:03.120 -05:00 INFO  [shop] req=7f3a9c POST /orders | START"
+        ]
+      }
+    },
+    {
+      "name": "offset with minutes",
+      "options": { "utcOffsetMinutes": 330 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "POST /orders | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 19:45:03.120 +05:30 INFO  [shop] req=7f3a9c POST /orders | START"
+        ]
+      }
+    }
+  ],
+  "sql": [
+    {
+      "name": "select with a join",
+      "sql": "SELECT \"Order\".\"id\" AS \"Order_id\", \"items\".\"sku\" AS \"items_sku\" FROM \"orders\" \"Order\" LEFT JOIN \"order_items\" \"items\" ON \"items\".\"order_id\"=\"Order\".\"id\" WHERE \"Order\".\"id\" = $1",
+      "op": "SELECT",
+      "tables": ["orders", "order_items"]
+    },
+    {
+      "name": "count",
+      "sql": "SELECT COUNT(*) FROM \"orders\" \"Order\"",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "insert with returning",
+      "sql": "INSERT INTO \"orders\"(\"id\", \"customer_email\", \"status\") VALUES (DEFAULT, $1, $2) RETURNING \"id\"",
+      "op": "INSERT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "update keeps the schema",
+      "sql": "UPDATE \"warehouse\".\"inventory\" SET \"available\" = \"available\" - 1 WHERE \"sku\" = $1",
+      "op": "UPDATE",
+      "tables": ["warehouse.inventory"]
+    },
+    {
+      "name": "delete",
+      "sql": "DELETE FROM \"order_items\" WHERE \"order_id\" = $1",
+      "op": "DELETE",
+      "tables": ["order_items"]
+    },
+    {
+      "name": "subquery in where",
+      "sql": "SELECT \"Order\".\"id\" AS \"Order_id\" FROM \"orders\" \"Order\" WHERE \"Order\".\"id\" IN (SELECT \"oi\".\"order_id\" FROM \"order_items\" \"oi\" WHERE \"oi\".\"sku\" = $1)",
+      "op": "SELECT",
+      "tables": ["orders", "order_items"]
+    },
+    {
+      "name": "common table expression is skipped",
+      "sql": "WITH low AS (SELECT sku FROM warehouse.inventory WHERE available < 5) SELECT * FROM low",
+      "op": "SELECT",
+      "tables": ["warehouse.inventory"]
+    },
+    {
+      "name": "recursive common table expression with a column list",
+      "sql": "WITH RECURSIVE tree(id) AS (SELECT id FROM categories UNION ALL SELECT c.id FROM categories c JOIN tree t ON c.parent_id = t.id) SELECT * FROM tree",
+      "op": "SELECT",
+      "tables": ["categories"]
+    },
+    {
+      "name": "start transaction keeps both words",
+      "sql": "START TRANSACTION",
+      "op": "START TRANSACTION",
+      "tables": []
+    },
+    {
+      "name": "commit",
+      "sql": "COMMIT",
+      "op": "COMMIT",
+      "tables": []
+    },
+    {
+      "name": "rollback",
+      "sql": "ROLLBACK",
+      "op": "ROLLBACK",
+      "tables": []
+    },
+    {
+      "name": "lower case statement",
+      "sql": "select id from orders where id = $1",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "subquery in from is skipped",
+      "sql": "SELECT \"distinctAlias\".\"id\" FROM (SELECT \"Order\".\"id\" FROM \"orders\" \"Order\") \"distinctAlias\" LIMIT 10",
+      "op": "SELECT",
+      "tables": ["orders"]
+    }
+  ]
+}
