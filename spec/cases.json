@@ -365,6 +365,78 @@
       }
     },
     {
+      "name": "thrown value that is not an Error",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "FAILED",
+        "durationMs": 3.04,
+        "firstReport": true,
+        "err": { "name": "ThrownValue", "message": "{\"code\":\"E1\"}" }
+      },
+      "expect": {
+        "level": "error",
+        "msg": "OrderService.handleOrder - run | FAILED 3ms ThrownValue: {\"code\":\"E1\"}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "FAILED",
+          "ms": 3,
+          "err": { "name": "ThrownValue", "message": "{\"code\":\"E1\"}" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 ERROR [shop] [OrderService.handleOrder] req=7f3a9c run | FAILED 3ms ThrownValue: {\"code\":\"E1\"}"
+        ]
+      }
+    },
+    {
+      "name": "thrown value that cannot be read",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "FAILED",
+        "durationMs": 3.04,
+        "firstReport": true,
+        "err": {
+          "name": "UnreadableError",
+          "message": "[unreadable thrown value]"
+        }
+      },
+      "expect": {
+        "level": "error",
+        "msg": "OrderService.handleOrder - run | FAILED 3ms UnreadableError: [unreadable thrown value]",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "FAILED",
+          "ms": 3,
+          "err": {
+            "name": "UnreadableError",
+            "message": "[unreadable thrown value]"
+          }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 ERROR [shop] [OrderService.handleOrder] req=7f3a9c run | FAILED 3ms UnreadableError: [unreadable thrown value]"
+        ]
+      }
+    },
+    {
       "name": "failed query at warn without stack",
       "options": { "utcOffsetMinutes": 420 },
       "event": {

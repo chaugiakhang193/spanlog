@@ -117,6 +117,11 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
 - The same error object thrown again in another request is reported once in that request too.
 - A thrown value that is not an object, such as a string, is wrapped in an `Error`. The wrapper is rethrown, and code
   further up receives the wrapper.
+- A thrown object or function that is not an `Error` is rethrown unchanged. Its `name` is `ThrownValue`. Its `message`
+  is the redacted JSON of the object, or `[Function {name}]` for a function, with `anonymous` when the function has no
+  name.
+- When reading the thrown value throws, its `name` is `UnreadableError` and its `message` is
+  `[unreadable thrown value]`. An `Error` with a throwing getter falls under this case too.
 - A failed SQL statement writes `FAILED` at warn level with `name` and `message`, without a stack. The frame that
   receives the error reports it.
 - `message` is written as the `Error` carries it. A database error can repeat a parameter value, as Postgres does in

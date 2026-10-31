@@ -371,7 +371,7 @@ describe('errors', () => {
     await expect(outer.run()).rejects.toEqual({ code: 'E1', token: 't' });
 
     expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
-      name: 'NonError',
+      name: 'ThrownValue',
       message: '{"code":"E1","token":"[REDACTED]"}',
     });
   });
@@ -390,7 +390,38 @@ describe('errors', () => {
     await expect(outer.run()).rejects.toBe(thrown);
 
     expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
-      name: 'NonError',
+      name: 'UnreadableError',
+      message: '[unreadable thrown value]',
+    });
+  });
+
+  it('describes a thrown function by its name', async () => {
+    function refused(): void {}
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, refused);
+
+    await expect(outer.run()).rejects.toBe(refused);
+
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
+      name: 'ThrownValue',
+      message: '[Function refused]',
+    });
+  });
+
+  it('marks an Error whose message getter throws as unreadable', async () => {
+    const thrown = new Error('x');
+    Object.defineProperty(thrown, 'message', {
+      get() {
+        throw new Error('getter failed');
+      },
+    });
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, thrown);
+
+    await expect(outer.run()).rejects.toBe(thrown);
+
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
+      name: 'UnreadableError',
       message: '[unreadable thrown value]',
     });
   });

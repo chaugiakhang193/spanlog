@@ -493,6 +493,9 @@ describe('errorMessage option', () => {
 
     expect(JSON.stringify(written)).not.toContain(SECRET);
     expect(written.at(-1)?.fields.phase).toBe('FAILED');
+    expect(written.at(-1)?.fields.err).toMatchObject({
+      name: 'UnreadableError',
+    });
   });
 
   it('leaves a thrown plain object to redact', async () => {

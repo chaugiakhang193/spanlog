@@ -4,11 +4,12 @@ import { redact } from './redact.js';
 import { stableJson } from './render.js';
 import type { ErrorInfo } from './types.js';
 
-// NonError is the err.name of a thrown value that is not an Error, such as a
-// plain object or a function. The call still ends with FAILED. UNREADABLE
-// stands in when reading the thrown value throws, for an Error as well.
+// THROWN_VALUE is the err.name of a thrown object or function that is not an
+// Error. UNREADABLE stands in when reading the thrown value throws, for an Error
+// as well. The call ends with FAILED in both cases.
+const THROWN_VALUE = 'ThrownValue';
 const UNREADABLE: ErrorInfo = {
-  name: 'NonError',
+  name: 'UnreadableError',
   message: '[unreadable thrown value]',
 };
 
@@ -73,12 +74,12 @@ function readErrorInfo(
   }
   if (typeof failure === 'function') {
     return {
-      name: 'NonError',
+      name: THROWN_VALUE,
       message: `[Function ${failure.name || 'anonymous'}]`,
     };
   }
   return {
-    name: 'NonError',
+    name: THROWN_VALUE,
     message: stableJson(redact(failure, { keys: redactKeys })),
   };
 }
