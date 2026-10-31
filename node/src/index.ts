@@ -1,5 +1,11 @@
 export { createSpanlog, DEFAULT_SLOW_MS, getRequestId } from './spanlog.js';
-export type { CallOptions, Spanlog, SpanlogOptions } from './spanlog.js';
+export type {
+  CallOptions,
+  QuerySpan,
+  RequestSpan,
+  Spanlog,
+  SpanlogOptions,
+} from './spanlog.js';
 export { render } from './render.js';
 export type { RenderOptions } from './render.js';
 export { jsonSink, pinoSink, prettySink } from './sinks.js';

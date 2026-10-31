@@ -780,6 +780,378 @@
       "sql": "SELECT \"distinctAlias\".\"id\" FROM (SELECT \"Order\".\"id\" FROM \"orders\" \"Order\") \"distinctAlias\" LIMIT 10",
       "op": "SELECT",
       "tables": ["orders"]
+    },
+    {
+      "name": "upsert names the insert table only",
+      "sql": "INSERT INTO \"warehouse\".\"inventory\"(\"sku\", \"available\") VALUES ($1, $2) ON CONFLICT ( \"sku\" ) DO UPDATE SET \"available\" = EXCLUDED.\"available\"",
+      "op": "INSERT",
+      "tables": ["warehouse.inventory"]
+    },
+    {
+      "name": "row lock is not a table",
+      "sql": "SELECT \"Inventory\".\"sku\" AS \"Inventory_sku\" FROM \"warehouse\".\"inventory\" \"Inventory\" WHERE \"Inventory\".\"sku\" = $1 FOR UPDATE NOWAIT",
+      "op": "SELECT",
+      "tables": ["warehouse.inventory"]
+    },
+    {
+      "name": "savepoint",
+      "sql": "SAVEPOINT typeorm_1",
+      "op": "SAVEPOINT",
+      "tables": []
+    },
+    {
+      "name": "rollback to a savepoint",
+      "sql": "ROLLBACK TO SAVEPOINT typeorm_1",
+      "op": "ROLLBACK",
+      "tables": []
+    },
+    {
+      "name": "string literal is not read",
+      "sql": "INSERT INTO notes (body) VALUES ('sent from alice today')",
+      "op": "INSERT",
+      "tables": ["notes"]
+    },
+    {
+      "name": "doubled quote inside a string literal",
+      "sql": "SELECT id FROM orders WHERE note = 'it''s from alice'",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "escape string with a backslash quote",
+      "sql": "SELECT id FROM orders WHERE note = E'it\\'s from alice'",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "dollar-quoted string",
+      "sql": "SELECT $tag$ from alice $tag$ FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "line comment before the statement",
+      "sql": "-- from alice\nSELECT id FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "nested block comment before the statement",
+      "sql": "/* from /* inner */ alice */ SELECT \"o\".\"id\" FROM \"orders\" \"o\"",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "nested common table expression",
+      "sql": "WITH a AS (WITH b AS (SELECT * FROM orders) SELECT * FROM b) SELECT * FROM a",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "WITH TIME ZONE does not hide a table",
+      "sql": "SELECT now()::timestamp with time zone FROM time",
+      "op": "SELECT",
+      "tables": ["time"]
+    },
+    {
+      "name": "ONLY is not a table",
+      "sql": "SELECT * FROM ONLY \"orders\"",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "UPDATE ONLY names the table",
+      "sql": "UPDATE ONLY orders SET status = $1",
+      "op": "UPDATE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "LATERAL subquery has no name",
+      "sql": "SELECT * FROM orders CROSS JOIN LATERAL (SELECT 1 FROM items) l",
+      "op": "SELECT",
+      "tables": ["orders", "items"]
+    },
+    {
+      "name": "FOR NO KEY UPDATE is not a table",
+      "sql": "SELECT \"o\".\"id\" FROM \"orders\" \"o\" FOR NO KEY UPDATE NOWAIT",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "IS DISTINCT FROM is not a table",
+      "sql": "SELECT id FROM orders WHERE status IS NOT DISTINCT FROM paid",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "dollar quote tag with a diacritic is skipped",
+      "sql": "SELECT $é$x FROM private_value $é$ FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "dollar quote tag in a non-Latin script is skipped",
+      "sql": "SELECT $日本$x FROM private_value $日本$ FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "unquoted name with non-ASCII letters is kept whole",
+      "sql": "SELECT 1 FROM đơn_hàng",
+      "op": "SELECT",
+      "tables": ["đơn_hàng"]
+    },
+    {
+      "name": "E string continued on the next line keeps backslash escapes",
+      "sql": "SELECT E'a'\n'\\' FROM private_value' FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "E string continued after a line comment keeps backslash escapes",
+      "sql": "SELECT E'a' -- note\n-- note\n  '\\' FROM private_value' FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "line comment ends at a carriage return",
+      "sql": "SELECT 'a' -- note\r, 'b\n FROM private_value' FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression inside a subquery does not hide the outer table",
+      "sql": "SELECT * FROM orders WHERE EXISTS (WITH orders AS (SELECT * FROM items) SELECT * FROM orders)",
+      "op": "SELECT",
+      "tables": ["orders", "items"]
+    },
+    {
+      "name": "common table expression ends with the subquery that holds it",
+      "sql": "SELECT * FROM (WITH orders AS (SELECT 1) SELECT * FROM orders) x JOIN orders ON true",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression reads the table it shadows",
+      "sql": "WITH orders AS (SELECT * FROM orders) SELECT * FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression is not visible to the one before it",
+      "sql": "WITH b AS (SELECT * FROM items), items AS (SELECT 1) SELECT * FROM items JOIN b ON true",
+      "op": "SELECT",
+      "tables": ["items"]
+    },
+    {
+      "name": "common table expression is visible to the one after it",
+      "sql": "WITH a AS (SELECT 1), b AS (SELECT * FROM a) SELECT * FROM b",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "WITH RECURSIVE expression reads itself",
+      "sql": "WITH RECURSIVE t AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM t WHERE n < 2) SELECT * FROM t",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "quoted common table expression name keeps its case",
+      "sql": "WITH \"Orders\" AS (SELECT 1) SELECT * FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "unquoted common table expression name folds to lower case",
+      "sql": "WITH ORDERS AS (SELECT 1) SELECT * FROM \"orders\"",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "ONLY with parentheses around the name",
+      "sql": "SELECT 1 FROM ONLY (orders)",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of a DELETE",
+      "sql": "WITH orders AS (SELECT 1) DELETE FROM orders",
+      "op": "DELETE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of an UPDATE",
+      "sql": "WITH orders AS (SELECT 1) UPDATE orders SET id = 1",
+      "op": "UPDATE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of an INSERT",
+      "sql": "WITH orders AS (SELECT 1) INSERT INTO orders VALUES (1)",
+      "op": "INSERT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of a MERGE",
+      "sql": "WITH orders AS (SELECT 1 AS id) MERGE INTO orders USING items ON true WHEN MATCHED THEN DELETE",
+      "op": "MERGE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of a write in a later expression",
+      "sql": "WITH orders AS (SELECT 1 AS id), gone AS (DELETE FROM orders RETURNING id) SELECT * FROM gone",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression hides what a write reads",
+      "sql": "WITH a AS (SELECT 1 AS id) INSERT INTO orders SELECT id FROM a",
+      "op": "INSERT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "WITH ORDINALITY AS is not a common table expression",
+      "sql": "SELECT * FROM unnest(ARRAY[1]) WITH ORDINALITY AS t JOIN ordinality ON true",
+      "op": "SELECT",
+      "tables": ["unnest", "ordinality"]
+    },
+    {
+      "name": "statements joined by a semicolon read as one statement",
+      "sql": "WITH a AS (SELECT 1) SELECT * FROM a; SELECT * FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "unquoted name keeps the case of a non-ASCII letter",
+      "sql": "WITH É AS (SELECT 1) SELECT * FROM é",
+      "op": "SELECT",
+      "tables": ["é"]
+    },
+    {
+      "name": "quoted and unquoted name with the same non-ASCII letter match",
+      "sql": "WITH \"É\" AS (SELECT 1) SELECT * FROM É",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "op of a statement in parentheses",
+      "sql": "(SELECT 1 FROM orders)",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "op of a WITH statement in parentheses",
+      "sql": "((WITH a AS (SELECT * FROM items) SELECT * FROM a))",
+      "op": "SELECT",
+      "tables": ["items"]
+    },
+    {
+      "name": "op of a set operation between parentheses",
+      "sql": "(SELECT 1 FROM orders) UNION (SELECT 1 FROM items)",
+      "op": "SELECT",
+      "tables": ["orders", "items"]
+    },
+    {
+      "name": "alias list named materialized after WITH ORDINALITY is not an expression",
+      "sql": "SELECT * FROM unnest(ARRAY[1]) WITH ORDINALITY materialized (v, n) JOIN ordinality ON true",
+      "op": "SELECT",
+      "tables": ["unnest", "ordinality"]
+    },
+    {
+      "name": "alias list after WITH ORDINALITY AS materialized is not an expression",
+      "sql": "SELECT * FROM unnest(ARRAY[1]) WITH ORDINALITY AS materialized (v, n) JOIN ordinality ON true",
+      "op": "SELECT",
+      "tables": ["unnest", "ordinality"]
+    },
+    {
+      "name": "expression named ordinality with a MATERIALIZED body",
+      "sql": "WITH ordinality AS MATERIALIZED (SELECT 1) SELECT * FROM ordinality",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "expression whose body starts with a parenthesis",
+      "sql": "WITH a AS ((SELECT 1)) SELECT * FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "expression whose body is VALUES",
+      "sql": "WITH a AS (VALUES (1)) SELECT * FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "column named delete before FROM reads the expression",
+      "sql": "WITH a AS (SELECT 1 AS delete) SELECT delete FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "DELETE inside an expression body writes a table of that name",
+      "sql": "WITH a AS (SELECT 1), gone AS (DELETE FROM a RETURNING *) SELECT * FROM gone",
+      "op": "SELECT",
+      "tables": ["a"]
+    },
+    {
+      "name": "UPDATE action of MERGE names no table",
+      "sql": "MERGE INTO orders USING (SELECT 1 AS id) AS src ON true WHEN MATCHED THEN UPDATE SET id = src.id",
+      "op": "MERGE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "letter that capitalizes to ASCII does not make a keyword",
+      "sql": "WITH a AS (SELECT 1 AS joın) SELECT joın FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "op capitalizes only a to z",
+      "sql": "ßelect 1",
+      "op": "ßELECT",
+      "tables": []
+    },
+    {
+      "name": "op of a parenthesized statement after the expressions",
+      "sql": "WITH a AS (SELECT * FROM items) (SELECT * FROM a)",
+      "op": "SELECT",
+      "tables": ["items"]
+    },
+    {
+      "name": "op of parenthesized VALUES after the expressions",
+      "sql": "WITH a AS (SELECT 1) (VALUES (1))",
+      "op": "VALUES",
+      "tables": []
+    },
+    {
+      "name": "SEARCH clause belongs to its expression",
+      "sql": "WITH RECURSIVE t(n) AS (VALUES (1) UNION ALL SELECT n + 1 FROM t WHERE n < 2) SEARCH DEPTH FIRST BY n SET ord SELECT * FROM t",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "CYCLE clause belongs to its expression",
+      "sql": "WITH RECURSIVE t(n) AS (VALUES (1) UNION ALL SELECT n + 1 FROM t WHERE n < 2) CYCLE n SET is_cycle TO true DEFAULT false USING path SELECT * FROM t",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "expression list goes on after SEARCH and CYCLE",
+      "sql": "WITH RECURSIVE t(n, m) AS (VALUES (1, 1) UNION ALL SELECT n + 1, m FROM t WHERE n < 2) SEARCH BREADTH FIRST BY n, m SET ord CYCLE n, m SET is_cycle USING path, u AS (SELECT * FROM orders) SELECT * FROM t JOIN u ON true",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "reading a CYCLE clause stops at a parenthesis",
+      "sql": "WITH a AS (SELECT 1) CYCLE n (SELECT * FROM a) USING p",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "known limit: unquoted column named update reads as a table keyword",
+      "sql": "SELECT update FROM orders",
+      "op": "SELECT",
+      "tables": ["FROM", "orders"]
     }
   ]
 }

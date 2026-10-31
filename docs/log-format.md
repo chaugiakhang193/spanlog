@@ -55,8 +55,8 @@ inside one process. Another process writes its own lines under its own `service`
 The built-in JSON writer adds `time` (ISO 8601, UTC), `level` and `msg`. With pino or slog as the destination, the
 encoding of time, level and message follows that logger.
 
-Arguments, return values, SQL text and SQL parameters are never written unless the application passes them as
-`params` or `summary`.
+Arguments, return values, SQL text and SQL parameters are not written unless the application passes them as `params`
+or `summary`. The exception is the `message` of an `Error`, which can repeat a value. See [Errors](#errors).
 
 ## Levels
 
@@ -119,17 +119,51 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
   further up receives the wrapper.
 - A failed SQL statement writes `FAILED` at warn level with `name` and `message`, without a stack. The frame that
   receives the error reports it.
+- `message` is written as the `Error` carries it. A database error can repeat a parameter value, as Postgres does in
+  `invalid input syntax for type integer: "..."`. The `errorMessage` option replaces the message of every `Error` on
+  the lines and in `err.stack`. When that function throws, the description of an unreadable value stands in.
+- With `errorMessage` in Node.js, the stack keeps its frames when its start holds the current message in one of these
+  forms: `{name}: {message}`, `{other name}: {message}` where the other name has no `: ` (`err.name` was assigned after
+  the stack was written), `{name}` alone when the message is empty, `{message}` alone when the name is empty. Any other
+  stack keeps its replaced first line and no frames. Assigning `err.message` after `err.stack` was read leaves such a
+  stack, and a line of the old message cannot be told apart from a frame. An `Error` with an empty message whose
+  `err.name` was assigned after the stack was written loses its frames too.
+- Known limit of `errorMessage`: when the value assigned to `err.message` after `err.stack` was read equals the leading
+  lines of the old message, a later line of the old message that starts with whitespace and `at ` stays in the stack as
+  a frame.
 
 ## Query lines
 
 - `op` is the first keyword of the statement in capitals. `START TRANSACTION` keeps both words. For a statement that
-  starts with `WITH`, `op` is the keyword after the common table expressions.
+  starts with `WITH`, `op` is the keyword after the common table expressions. Parentheses before that keyword are
+  skipped, both at the start of the statement and after the expressions.
+- Keywords compare after folding `a`-`z` to capitals and nothing else, and `op` is capitalized the same way. A letter
+  such as `ı` or `ß` stays as it is, even where a Unicode upper-case function would turn it into `I` or `SS`.
 - `tables` lists every name that follows `FROM`, `JOIN`, `INTO` or `UPDATE`, in the order first seen, without
-  duplicates. Double quotes are removed and a schema prefix is kept (`warehouse.inventory`). Names of common table
-  expressions and subqueries are skipped.
+  duplicates. Double quotes are removed and a schema prefix is kept (`warehouse.inventory`). Subqueries are skipped.
+  `ONLY`, `ONLY (` and `LATERAL` before a name are skipped.
+- A name without a schema prefix is skipped when it refers to a common table expression. The expression is visible
+  from the end of its own body to the end of the statement or subquery that holds its `WITH`. With `WITH RECURSIVE`
+  it is visible from the `WITH` on. Names compare as Postgres compares them in a UTF-8 database: an unquoted name folds
+  `A`-`Z` to lower case and keeps other letters, and a quoted name keeps its case. A `WITH` name counts as an
+  expression only when a parenthesis follows it, after any `AS`, `NOT` and `MATERIALIZED`, and the first token inside
+  is `(` or one of `SELECT`, `VALUES`, `TABLE`, `WITH`, `INSERT`, `UPDATE`, `DELETE`, `MERGE`. `SEARCH ... SET name` and
+  `CYCLE ... USING name` after the body belong to the expression. Reading either stops at a parenthesis.
+- The table written by `DELETE FROM`, `INSERT INTO`, `MERGE INTO` or `UPDATE` is always listed, because Postgres does
+  not resolve it to a common table expression. `DELETE` before `FROM` counts as that command when it follows `(` or the
+  list of expressions. Elsewhere it is a column name.
+- `UPDATE` directly after `FOR` or `KEY` (a row lock), `DO` (the update of an upsert) or `THEN` (the action of a
+  `MERGE`) does not name a table. `FROM` in `IS [NOT] DISTINCT FROM` does not name a table.
+- String literals (`'...'`, `E'...'` with its continuation lines, `$tag$...$tag$`) and comments (`-- ...`, `/* ... */`)
+  are skipped unread. A name or a tag can hold any character from U+0080 up.
 - `target` is `{op}` followed by the tables joined with `, `, or `{op}` alone when there is no table.
-- Known limits: a keyword inside a string literal can produce a wrong table name, and `FROM some_function(...)`
-  reports the function name.
+- Known limits: `FROM some_function(...)` reports the function name, `FROM` inside a call such as
+  `EXTRACT(YEAR FROM created_at)` reports the column, a name after a comma (`FROM a, b`) or first inside parentheses
+  (`FROM (a JOIN b ON true)`) is not listed, a backslash escape outside `E'...'`, as in MySQL, can end a literal
+  early, an unquoted column named `update` reads as the keyword (`SELECT update FROM orders` lists `FROM`), a column
+  list after `WITH ORDINALITY AS materialized` that starts with a statement keyword reads as an expression, and
+  statements joined by `;` read as one statement: `op` is that of the first, and a common table expression stays visible
+  up to the end of the text.
 
 ## Example
 

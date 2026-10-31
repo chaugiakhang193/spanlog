@@ -16,7 +16,8 @@ import { withoutOwnFrames } from './frames.js';
 import { redact } from './redact.js';
 import { levelFor, render } from './render.js';
 import { prettySink, type SpanSink } from './sinks.js';
-import type { Action, Level, SpanEvent } from './types.js';
+import { queryTarget, summarizeSql } from './sql.js';
+import type { Action, Level, Phase, SpanEvent } from './types.js';
 
 export interface SpanlogOptions {
   /** Service name written on every line. */
@@ -34,6 +35,13 @@ export interface SpanlogOptions {
   utcOffsetMinutes?: number;
   /** Keys masked in params and summary on top of DEFAULT_REDACT_KEYS. */
   redactKeys?: string[];
+  /**
+   * Replaces the message of every Error on the lines and in err.stack.
+   * Defaults to the message as the Error carries it, which can repeat a value
+   * from the application, such as a query parameter in a database error. When
+   * the function throws, a fixed text stands in for the message.
+   */
+  errorMessage?: (error: Error) => string;
 }
 
 export interface CallOptions<T> {
@@ -44,6 +52,29 @@ export interface CallOptions<T> {
    * it an array result is summarised as its length.
    */
   summarize?: (result: T) => Record<string, unknown>;
+}
+
+/** RequestSpan ends the request lines opened by startRequest. */
+export interface RequestSpan {
+  /**
+   * end writes DONE, SLOW or, for a status of 500 or higher, FAILED with
+   * status. Only the first call to end or abort writes a line.
+   */
+  end(status: number): void;
+  /** abort writes ABORTED. Only the first call to end or abort writes a line. */
+  abort(): void;
+}
+
+/** QuerySpan ends the query lines opened by startQuery. */
+export interface QuerySpan {
+  /** end writes DONE or SLOW. Only the first call to end or fail writes a line. */
+  end(): void;
+  /**
+   * fail writes FAILED with the name and message of thrown, without a stack.
+   * The error stays unreported, and the frame that receives it reports it.
+   * Only the first call to end or fail writes a line.
+   */
+  fail(thrown: unknown): void;
 }
 
 export interface Spanlog {
@@ -66,6 +97,18 @@ export interface Spanlog {
    * reqId, and each error is reported with its stack once.
    */
   withRequest<T>(reqId: string | undefined, fn: () => T): T;
+  /**
+   * startRequest writes the START line of an incoming request named target,
+   * such as "POST /orders". Called inside withRequest, every line of the
+   * request carries the same reqId. Framework adapters call it.
+   */
+  startRequest(target: string): RequestSpan;
+  /**
+   * startQuery writes the START line of a SQL statement in the frame running
+   * now. The statement is read for its op and tables. Its text is never
+   * written. Database adapters call it.
+   */
+  startQuery(sql: string): QuerySpan;
 }
 
 export const DEFAULT_SLOW_MS = 500;
@@ -114,6 +157,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
   const slowMs = options.slowMs ?? DEFAULT_SLOW_MS;
   const fixedOffsetMinutes = options.utcOffsetMinutes;
   const redactKeys = options.redactKeys ?? [];
+  const errorMessage = options.errorMessage;
 
   function emit(unstamped: UnstampedEvent): void {
     const event: SpanEvent = { ...unstamped, time: new Date(), service };
@@ -167,7 +211,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
         reqId,
         phase: 'FAILED',
         durationMs: performance.now() - startedAt,
-        err: errorInfo(failure, redactKeys),
+        err: errorInfo(failure, redactKeys, errorMessage),
         firstReport: markReported(request, failure),
       });
       throw failure;
@@ -290,7 +334,83 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     );
   }
 
-  return { traced, call: spanlogCall, withRequest: spanlogWithRequest };
+  // endOnce returns the writer of the end line for a span opened with
+  // startLine. Only the first call writes. An adapter can end the same span
+  // from more than one event.
+  function endOnce(
+    startLine: UnstampedEvent,
+  ): (end: Partial<UnstampedEvent>) => void {
+    const startedAt = performance.now();
+    let ended = false;
+    return (end) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      const durationMs = performance.now() - startedAt;
+      emit({
+        ...startLine,
+        phase: phaseAfter(durationMs),
+        ...end,
+        durationMs,
+      });
+    };
+  }
+
+  function phaseAfter(durationMs: number): Phase {
+    return durationMs > slowMs ? 'SLOW' : 'DONE';
+  }
+
+  function startRequest(target: string): RequestSpan {
+    const startLine: UnstampedEvent = {
+      action: 'request',
+      target,
+      reqId: currentContext()?.request.reqId,
+      phase: 'START',
+    };
+    emit(startLine);
+    const writeEnd = endOnce(startLine);
+    return {
+      end: (status) =>
+        writeEnd(status >= 500 ? { phase: 'FAILED', status } : { status }),
+      abort: () => writeEnd({ phase: 'ABORTED' }),
+    };
+  }
+
+  function startQuery(sql: string): QuerySpan {
+    const context = currentContext();
+    const summary = summarizeSql(sql);
+    const startLine: UnstampedEvent = {
+      scope: context?.frame?.scope,
+      method: context?.frame?.method,
+      action: 'query',
+      target: queryTarget(summary),
+      reqId: context?.request.reqId,
+      phase: 'START',
+      op: summary.op,
+      tables: summary.tables,
+    };
+    emit(startLine);
+    const writeEnd = endOnce(startLine);
+    return {
+      end: () => writeEnd({}),
+      // A failed statement is not marked as reported. The frame that receives
+      // the error writes it with its stack.
+      fail: (thrown) =>
+        writeEnd({
+          phase: 'FAILED',
+          err: errorInfo(toFailure(thrown), redactKeys, errorMessage),
+        }),
+    };
+  }
+
+  return {
+    traced,
+    call: spanlogCall,
+    withRequest: spanlogWithRequest,
+    startRequest,
+    startQuery,
+  };
 }
 
 // ownerOf decides whose line a wrapped call writes. Inside another wrapped

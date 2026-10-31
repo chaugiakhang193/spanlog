@@ -14,7 +14,8 @@ Node.js and in Go. There is no collector, dashboard or account to set up.
   same sample lines.
 - **Install once.** A middleware and one wrapper per service in Express. A `Start` call with `defer` in Go.
 - **Safe defaults.** Arguments, results and SQL text stay out of the logs unless enabled. Each error is logged once,
-  with its stack.
+  with its stack. An error's message is written as it is and can repeat a value, as a database error can repeat a SQL
+  parameter. The `errorMessage` option replaces it.
 
 ## Status
 
