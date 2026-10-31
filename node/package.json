@@ -22,6 +22,10 @@
     "./express": {
       "types": "./dist/express.d.ts",
       "default": "./dist/express.js"
+    },
+    "./typeorm": {
+      "types": "./dist/typeorm.d.ts",
+      "default": "./dist/typeorm.js"
     }
   },
   "files": [
@@ -32,14 +36,19 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
+    "test:pg": "vitest run --config vitest.pg.config.ts",
     "format": "prettier --write \"src/**/*.ts\" \"*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"*.ts\""
   },
   "peerDependencies": {
-    "express": "^5.0.0"
+    "express": "^5.0.0",
+    "typeorm": "^1.1.0"
   },
   "peerDependenciesMeta": {
     "express": {
+      "optional": true
+    },
+    "typeorm": {
       "optional": true
     }
   },
@@ -47,7 +56,9 @@
     "@types/express": "5.0.6",
     "@types/node": "24.19.2",
     "express": "5.3.0",
+    "pg": "8.23.1",
     "prettier": "3.9.10",
+    "typeorm": "1.1.2",
     "typescript": "6.0.3",
     "vitest": "4.1.12"
   }
