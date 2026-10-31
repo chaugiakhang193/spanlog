@@ -1,0 +1,1380 @@
+{
+  "version": 0,
+  "render": [
+    {
+      "name": "request start",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "POST /orders | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c POST /orders | START"
+        ]
+      }
+    },
+    {
+      "name": "run start",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - run | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c run | START"
+        ]
+      }
+    },
+    {
+      "name": "call to another scope starts at info",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "InventoryService.reserve",
+        "sameScope": false,
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - call InventoryService.reserve | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "InventoryService.reserve",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c call InventoryService.reserve | START"
+        ]
+      }
+    },
+    {
+      "name": "query done at debug with tables",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "InventoryService",
+        "method": "reserve",
+        "action": "query",
+        "target": "UPDATE warehouse.inventory",
+        "op": "UPDATE",
+        "tables": ["warehouse.inventory"],
+        "phase": "DONE",
+        "durationMs": 2.96
+      },
+      "expect": {
+        "level": "debug",
+        "msg": "InventoryService.reserve - query UPDATE warehouse.inventory | DONE 3ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "InventoryService",
+          "method": "reserve",
+          "action": "query",
+          "target": "UPDATE warehouse.inventory",
+          "phase": "DONE",
+          "ms": 3,
+          "op": "UPDATE",
+          "tables": ["warehouse.inventory"]
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 DEBUG [shop] [InventoryService.reserve] req=7f3a9c query UPDATE warehouse.inventory | DONE 3ms"
+        ]
+      }
+    },
+    {
+      "name": "call done rounds the duration",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "InventoryService.reserve",
+        "sameScope": false,
+        "phase": "DONE",
+        "durationMs": 4.96
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - call InventoryService.reserve | DONE 5ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "InventoryService.reserve",
+          "phase": "DONE",
+          "ms": 5
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c call InventoryService.reserve | DONE 5ms"
+        ]
+      }
+    },
+    {
+      "name": "slow call at warn",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "PaymentService.charge",
+        "sameScope": false,
+        "phase": "SLOW",
+        "durationMs": 801.04
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "OrderService.handleOrder - call PaymentService.charge | SLOW 801ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "PaymentService.charge",
+          "phase": "SLOW",
+          "ms": 801
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] [OrderService.handleOrder] req=7f3a9c call PaymentService.charge | SLOW 801ms"
+        ]
+      }
+    },
+    {
+      "name": "call within the same scope at debug",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "OrderService.validate",
+        "sameScope": true,
+        "phase": "DONE",
+        "durationMs": 0.42
+      },
+      "expect": {
+        "level": "debug",
+        "msg": "OrderService.handleOrder - call OrderService.validate | DONE 0.4ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "OrderService.validate",
+          "phase": "DONE",
+          "ms": 0.4
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 DEBUG [shop] [OrderService.handleOrder] req=7f3a9c call OrderService.validate | DONE 0.4ms"
+        ]
+      }
+    },
+    {
+      "name": "run done",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "DONE",
+        "durationMs": 819.96
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - run | DONE 820ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "DONE",
+          "ms": 820
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c run | DONE 820ms"
+        ]
+      }
+    },
+    {
+      "name": "request done with status",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "DONE",
+        "durationMs": 823.04,
+        "status": 201
+      },
+      "expect": {
+        "level": "info",
+        "msg": "POST /orders | DONE 201 823ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "DONE",
+          "ms": 823,
+          "status": 201
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c POST /orders | DONE 201 823ms"
+        ]
+      }
+    },
+    {
+      "name": "first report of an error carries the stack",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "call",
+        "target": "InventoryService.reserve",
+        "sameScope": false,
+        "phase": "FAILED",
+        "durationMs": 3.04,
+        "firstReport": true,
+        "err": {
+          "name": "Error",
+          "message": "stock not available",
+          "stack": "Error: stock not available\n    at InventoryService.reserve (file:///app/src/inventory.service.js:12:11)\n    at async OrderService.handleOrder (file:///app/src/order.service.js:20:5)"
+        }
+      },
+      "expect": {
+        "level": "error",
+        "msg": "OrderService.handleOrder - call InventoryService.reserve | FAILED 3ms Error: stock not available",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "call",
+          "target": "InventoryService.reserve",
+          "phase": "FAILED",
+          "ms": 3,
+          "err": {
+            "name": "Error",
+            "message": "stock not available",
+            "stack": "Error: stock not available\n    at InventoryService.reserve (file:///app/src/inventory.service.js:12:11)\n    at async OrderService.handleOrder (file:///app/src/order.service.js:20:5)"
+          }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 ERROR [shop] [OrderService.handleOrder] req=7f3a9c call InventoryService.reserve | FAILED 3ms Error: stock not available",
+          "    at InventoryService.reserve (file:///app/src/inventory.service.js:12:11)",
+          "    at async OrderService.handleOrder (file:///app/src/order.service.js:20:5)"
+        ]
+      }
+    },
+    {
+      "name": "outer frame of an error already reported",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "FAILED",
+        "durationMs": 30.04,
+        "firstReport": false,
+        "err": {
+          "name": "Error",
+          "message": "stock not available",
+          "stack": "Error: stock not available\n    at InventoryService.reserve (file:///app/src/inventory.service.js:12:11)"
+        }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "OrderService.handleOrder - run | FAILED 30ms Error: stock not available",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "FAILED",
+          "ms": 30,
+          "err": { "name": "Error", "message": "stock not available" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [OrderService.handleOrder] req=7f3a9c run | FAILED 30ms Error: stock not available"
+        ]
+      }
+    },
+    {
+      "name": "thrown value that is not an Error",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "FAILED",
+        "durationMs": 3.04,
+        "firstReport": true,
+        "err": { "name": "ThrownValue", "message": "{\"code\":\"E1\"}" }
+      },
+      "expect": {
+        "level": "error",
+        "msg": "OrderService.handleOrder - run | FAILED 3ms ThrownValue: {\"code\":\"E1\"}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "FAILED",
+          "ms": 3,
+          "err": { "name": "ThrownValue", "message": "{\"code\":\"E1\"}" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 ERROR [shop] [OrderService.handleOrder] req=7f3a9c run | FAILED 3ms ThrownValue: {\"code\":\"E1\"}"
+        ]
+      }
+    },
+    {
+      "name": "thrown value that cannot be read",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "run",
+        "phase": "FAILED",
+        "durationMs": 3.04,
+        "firstReport": true,
+        "err": {
+          "name": "UnreadableError",
+          "message": "[unreadable thrown value]"
+        }
+      },
+      "expect": {
+        "level": "error",
+        "msg": "OrderService.handleOrder - run | FAILED 3ms UnreadableError: [unreadable thrown value]",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "run",
+          "phase": "FAILED",
+          "ms": 3,
+          "err": {
+            "name": "UnreadableError",
+            "message": "[unreadable thrown value]"
+          }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 ERROR [shop] [OrderService.handleOrder] req=7f3a9c run | FAILED 3ms UnreadableError: [unreadable thrown value]"
+        ]
+      }
+    },
+    {
+      "name": "failed query at warn without stack",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "InventoryService",
+        "method": "reserve",
+        "action": "query",
+        "target": "UPDATE warehouse.inventory",
+        "op": "UPDATE",
+        "tables": ["warehouse.inventory"],
+        "phase": "FAILED",
+        "durationMs": 1.46,
+        "firstReport": true,
+        "err": {
+          "name": "QueryFailedError",
+          "message": "deadlock detected",
+          "stack": "QueryFailedError: deadlock detected\n    at PostgresQueryRunner.query (file:///app/node_modules/typeorm/index.js:1:1)"
+        }
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "InventoryService.reserve - query UPDATE warehouse.inventory | FAILED 1.5ms QueryFailedError: deadlock detected",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "InventoryService",
+          "method": "reserve",
+          "action": "query",
+          "target": "UPDATE warehouse.inventory",
+          "phase": "FAILED",
+          "ms": 1.5,
+          "op": "UPDATE",
+          "tables": ["warehouse.inventory"],
+          "err": { "name": "QueryFailedError", "message": "deadlock detected" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] [InventoryService.reserve] req=7f3a9c query UPDATE warehouse.inventory | FAILED 1.5ms QueryFailedError: deadlock detected"
+        ]
+      }
+    },
+    {
+      "name": "rollback at warn",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "InventoryService",
+        "method": "reserve",
+        "action": "query",
+        "target": "ROLLBACK",
+        "op": "ROLLBACK",
+        "tables": [],
+        "phase": "DONE",
+        "durationMs": 0.34
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "InventoryService.reserve - query ROLLBACK | DONE 0.3ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "InventoryService",
+          "method": "reserve",
+          "action": "query",
+          "target": "ROLLBACK",
+          "phase": "DONE",
+          "ms": 0.3,
+          "op": "ROLLBACK",
+          "tables": []
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] [InventoryService.reserve] req=7f3a9c query ROLLBACK | DONE 0.3ms"
+        ]
+      }
+    },
+    {
+      "name": "request failed with a 5xx status",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "FAILED",
+        "durationMs": 31.04,
+        "status": 500
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "POST /orders | FAILED 500 31ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "FAILED",
+          "ms": 31,
+          "status": 500
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] req=7f3a9c POST /orders | FAILED 500 31ms"
+        ]
+      }
+    },
+    {
+      "name": "request aborted by the client",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "ABORTED",
+        "durationMs": 12.04
+      },
+      "expect": {
+        "level": "warn",
+        "msg": "POST /orders | ABORTED 12ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "ABORTED",
+          "ms": 12
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 WARN  [shop] req=7f3a9c POST /orders | ABORTED 12ms"
+        ]
+      }
+    },
+    {
+      "name": "line outside a request",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "scope": "ReportJob",
+        "method": "build",
+        "action": "run",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "ReportJob.build - run | START",
+        "fields": {
+          "service": "shop",
+          "scope": "ReportJob",
+          "method": "build",
+          "action": "run",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] [ReportJob.build] req=- run | START"
+        ]
+      }
+    },
+    {
+      "name": "explicit call without a frame shows sorted params",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "call",
+        "target": "payments.charge",
+        "sameScope": false,
+        "phase": "START",
+        "params": { "orderId": "o-1", "amount": 120 }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call payments.charge | START {\"amount\":120,\"orderId\":\"o-1\"}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "call",
+          "target": "payments.charge",
+          "phase": "START",
+          "params": { "orderId": "o-1", "amount": 120 }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c call payments.charge | START {\"amount\":120,\"orderId\":\"o-1\"}"
+        ]
+      }
+    },
+    {
+      "name": "params keys are sorted at every level",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "call",
+        "target": "search.run",
+        "sameScope": false,
+        "phase": "START",
+        "params": { "b": { "z": 1, "a": 2 }, "a": [{ "y": 1, "x": 2 }] }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call search.run | START {\"a\":[{\"x\":2,\"y\":1}],\"b\":{\"a\":2,\"z\":1}}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "call",
+          "target": "search.run",
+          "phase": "START",
+          "params": { "b": { "z": 1, "a": 2 }, "a": [{ "y": 1, "x": 2 }] }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c call search.run | START {\"a\":[{\"x\":2,\"y\":1}],\"b\":{\"a\":2,\"z\":1}}"
+        ]
+      }
+    },
+    {
+      "name": "params keep characters that JSON encoders can escape",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "call",
+        "target": "search.run",
+        "sameScope": false,
+        "phase": "START",
+        "params": { "q": "<a&b>\u2028\u2029" }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call search.run | START {\"q\":\"<a&b>\u2028\u2029\"}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "call",
+          "target": "search.run",
+          "phase": "START",
+          "params": { "q": "<a&b>\u2028\u2029" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c call search.run | START {\"q\":\"<a&b>\u2028\u2029\"}"
+        ]
+      }
+    },
+    {
+      "name": "explicit call done with a summary",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "call",
+        "target": "repo.findOrders",
+        "sameScope": false,
+        "phase": "DONE",
+        "durationMs": 2.04,
+        "summary": { "count": 3 }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call repo.findOrders | DONE 2ms {\"count\":3}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "call",
+          "target": "repo.findOrders",
+          "phase": "DONE",
+          "ms": 2,
+          "summary": { "count": 3 }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c call repo.findOrders | DONE 2ms {\"count\":3}"
+        ]
+      }
+    },
+    {
+      "name": "error without a name",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "Mailer",
+        "method": "send",
+        "action": "run",
+        "phase": "FAILED",
+        "durationMs": 2.04,
+        "firstReport": true,
+        "err": { "message": "connection refused" }
+      },
+      "expect": {
+        "level": "error",
+        "msg": "Mailer.send - run | FAILED 2ms connection refused",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "Mailer",
+          "method": "send",
+          "action": "run",
+          "phase": "FAILED",
+          "ms": 2,
+          "err": { "message": "connection refused" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 ERROR [shop] [Mailer.send] req=7f3a9c run | FAILED 2ms connection refused"
+        ]
+      }
+    },
+    {
+      "name": "negative offset",
+      "options": { "utcOffsetMinutes": -300 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "POST /orders | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 09:15:03.120 -05:00 INFO  [shop] req=7f3a9c POST /orders | START"
+        ]
+      }
+    },
+    {
+      "name": "offset with minutes",
+      "options": { "utcOffsetMinutes": 330 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "request",
+        "target": "POST /orders",
+        "phase": "START"
+      },
+      "expect": {
+        "level": "info",
+        "msg": "POST /orders | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "request",
+          "target": "POST /orders",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 19:45:03.120 +05:30 INFO  [shop] req=7f3a9c POST /orders | START"
+        ]
+      }
+    },
+    {
+      "name": "empty strings count as absent",
+      "options": {
+        "utcOffsetMinutes": 0
+      },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "",
+        "scope": "",
+        "method": "m",
+        "action": "run",
+        "target": "",
+        "phase": "START",
+        "op": ""
+      },
+      "expect": {
+        "level": "info",
+        "msg": "run | START",
+        "fields": {
+          "service": "shop",
+          "method": "m",
+          "action": "run",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 14:15:03.120 +00:00 INFO  [shop] req=- run | START"
+        ]
+      }
+    },
+    {
+      "name": "negative duration rounds half up",
+      "options": {
+        "utcOffsetMinutes": 0
+      },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "action": "run",
+        "scope": "A",
+        "method": "b",
+        "phase": "DONE",
+        "durationMs": -1.25
+      },
+      "expect": {
+        "level": "info",
+        "msg": "A.b - run | DONE -1.2ms",
+        "fields": {
+          "service": "shop",
+          "scope": "A",
+          "method": "b",
+          "action": "run",
+          "phase": "DONE",
+          "ms": -1.2
+        },
+        "lines": [
+          "2026-10-24 14:15:03.120 +00:00 INFO  [shop] [A.b] req=- run | DONE -1.2ms"
+        ]
+      }
+    },
+    {
+      "name": "params keys sort by UTF-16 code unit",
+      "options": {
+        "utcOffsetMinutes": 0
+      },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "action": "call",
+        "target": "t",
+        "phase": "START",
+        "params": {
+          "": 1,
+          "𐀀": 2
+        }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call t | START {\"𐀀\":2,\"\":1}",
+        "fields": {
+          "service": "shop",
+          "action": "call",
+          "target": "t",
+          "phase": "START",
+          "params": {
+            "": 1,
+            "𐀀": 2
+          }
+        },
+        "lines": [
+          "2026-10-24 14:15:03.120 +00:00 INFO  [shop] req=- call t | START {\"𐀀\":2,\"\":1}"
+        ]
+      }
+    },
+    {
+      "name": "negative zero prints without a sign",
+      "options": { "utcOffsetMinutes": 0 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "action": "call",
+        "target": "t",
+        "phase": "DONE",
+        "durationMs": -0,
+        "summary": { "value": -0 }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call t | DONE 0ms {\"value\":0}",
+        "fields": {
+          "service": "shop",
+          "action": "call",
+          "target": "t",
+          "phase": "DONE",
+          "ms": -0,
+          "summary": { "value": -0 }
+        },
+        "lines": [
+          "2026-10-24 14:15:03.120 +00:00 INFO  [shop] req=- call t | DONE 0ms {\"value\":0}"
+        ]
+      }
+    }
+  ],
+  "sql": [
+    {
+      "name": "select with a join",
+      "sql": "SELECT \"Order\".\"id\" AS \"Order_id\", \"items\".\"sku\" AS \"items_sku\" FROM \"orders\" \"Order\" LEFT JOIN \"order_items\" \"items\" ON \"items\".\"order_id\"=\"Order\".\"id\" WHERE \"Order\".\"id\" = $1",
+      "op": "SELECT",
+      "tables": ["orders", "order_items"]
+    },
+    {
+      "name": "count",
+      "sql": "SELECT COUNT(*) FROM \"orders\" \"Order\"",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "insert with returning",
+      "sql": "INSERT INTO \"orders\"(\"id\", \"customer_email\", \"status\") VALUES (DEFAULT, $1, $2) RETURNING \"id\"",
+      "op": "INSERT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "update keeps the schema",
+      "sql": "UPDATE \"warehouse\".\"inventory\" SET \"available\" = \"available\" - 1 WHERE \"sku\" = $1",
+      "op": "UPDATE",
+      "tables": ["warehouse.inventory"]
+    },
+    {
+      "name": "delete",
+      "sql": "DELETE FROM \"order_items\" WHERE \"order_id\" = $1",
+      "op": "DELETE",
+      "tables": ["order_items"]
+    },
+    {
+      "name": "subquery in where",
+      "sql": "SELECT \"Order\".\"id\" AS \"Order_id\" FROM \"orders\" \"Order\" WHERE \"Order\".\"id\" IN (SELECT \"oi\".\"order_id\" FROM \"order_items\" \"oi\" WHERE \"oi\".\"sku\" = $1)",
+      "op": "SELECT",
+      "tables": ["orders", "order_items"]
+    },
+    {
+      "name": "common table expression is skipped",
+      "sql": "WITH low AS (SELECT sku FROM warehouse.inventory WHERE available < 5) SELECT * FROM low",
+      "op": "SELECT",
+      "tables": ["warehouse.inventory"]
+    },
+    {
+      "name": "recursive common table expression with a column list",
+      "sql": "WITH RECURSIVE tree(id) AS (SELECT id FROM categories UNION ALL SELECT c.id FROM categories c JOIN tree t ON c.parent_id = t.id) SELECT * FROM tree",
+      "op": "SELECT",
+      "tables": ["categories"]
+    },
+    {
+      "name": "start transaction keeps both words",
+      "sql": "START TRANSACTION",
+      "op": "START TRANSACTION",
+      "tables": []
+    },
+    {
+      "name": "commit",
+      "sql": "COMMIT",
+      "op": "COMMIT",
+      "tables": []
+    },
+    {
+      "name": "rollback",
+      "sql": "ROLLBACK",
+      "op": "ROLLBACK",
+      "tables": []
+    },
+    {
+      "name": "lower case statement",
+      "sql": "select id from orders where id = $1",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "subquery in from is skipped",
+      "sql": "SELECT \"distinctAlias\".\"id\" FROM (SELECT \"Order\".\"id\" FROM \"orders\" \"Order\") \"distinctAlias\" LIMIT 10",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "upsert names the insert table only",
+      "sql": "INSERT INTO \"warehouse\".\"inventory\"(\"sku\", \"available\") VALUES ($1, $2) ON CONFLICT ( \"sku\" ) DO UPDATE SET \"available\" = EXCLUDED.\"available\"",
+      "op": "INSERT",
+      "tables": ["warehouse.inventory"]
+    },
+    {
+      "name": "row lock is not a table",
+      "sql": "SELECT \"Inventory\".\"sku\" AS \"Inventory_sku\" FROM \"warehouse\".\"inventory\" \"Inventory\" WHERE \"Inventory\".\"sku\" = $1 FOR UPDATE NOWAIT",
+      "op": "SELECT",
+      "tables": ["warehouse.inventory"]
+    },
+    {
+      "name": "savepoint",
+      "sql": "SAVEPOINT typeorm_1",
+      "op": "SAVEPOINT",
+      "tables": []
+    },
+    {
+      "name": "rollback to a savepoint",
+      "sql": "ROLLBACK TO SAVEPOINT typeorm_1",
+      "op": "ROLLBACK",
+      "tables": []
+    },
+    {
+      "name": "string literal is not read",
+      "sql": "INSERT INTO notes (body) VALUES ('sent from alice today')",
+      "op": "INSERT",
+      "tables": ["notes"]
+    },
+    {
+      "name": "doubled quote inside a string literal",
+      "sql": "SELECT id FROM orders WHERE note = 'it''s from alice'",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "escape string with a backslash quote",
+      "sql": "SELECT id FROM orders WHERE note = E'it\\'s from alice'",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "dollar-quoted string",
+      "sql": "SELECT $tag$ from alice $tag$ FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "line comment before the statement",
+      "sql": "-- from alice\nSELECT id FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "nested block comment before the statement",
+      "sql": "/* from /* inner */ alice */ SELECT \"o\".\"id\" FROM \"orders\" \"o\"",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "nested common table expression",
+      "sql": "WITH a AS (WITH b AS (SELECT * FROM orders) SELECT * FROM b) SELECT * FROM a",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "WITH TIME ZONE does not hide a table",
+      "sql": "SELECT now()::timestamp with time zone FROM time",
+      "op": "SELECT",
+      "tables": ["time"]
+    },
+    {
+      "name": "ONLY is not a table",
+      "sql": "SELECT * FROM ONLY \"orders\"",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "UPDATE ONLY names the table",
+      "sql": "UPDATE ONLY orders SET status = $1",
+      "op": "UPDATE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "LATERAL subquery has no name",
+      "sql": "SELECT * FROM orders CROSS JOIN LATERAL (SELECT 1 FROM items) l",
+      "op": "SELECT",
+      "tables": ["orders", "items"]
+    },
+    {
+      "name": "FOR NO KEY UPDATE is not a table",
+      "sql": "SELECT \"o\".\"id\" FROM \"orders\" \"o\" FOR NO KEY UPDATE NOWAIT",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "IS DISTINCT FROM is not a table",
+      "sql": "SELECT id FROM orders WHERE status IS NOT DISTINCT FROM paid",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "dollar quote tag with a diacritic is skipped",
+      "sql": "SELECT $é$x FROM private_value $é$ FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "dollar quote tag in a non-Latin script is skipped",
+      "sql": "SELECT $日本$x FROM private_value $日本$ FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "unquoted name with non-ASCII letters is kept whole",
+      "sql": "SELECT 1 FROM đơn_hàng",
+      "op": "SELECT",
+      "tables": ["đơn_hàng"]
+    },
+    {
+      "name": "E string continued on the next line keeps backslash escapes",
+      "sql": "SELECT E'a'\n'\\' FROM private_value' FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "E string continued after a line comment keeps backslash escapes",
+      "sql": "SELECT E'a' -- note\n-- note\n  '\\' FROM private_value' FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "line comment ends at a carriage return",
+      "sql": "SELECT 'a' -- note\r, 'b\n FROM private_value' FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression inside a subquery does not hide the outer table",
+      "sql": "SELECT * FROM orders WHERE EXISTS (WITH orders AS (SELECT * FROM items) SELECT * FROM orders)",
+      "op": "SELECT",
+      "tables": ["orders", "items"]
+    },
+    {
+      "name": "common table expression ends with the subquery that holds it",
+      "sql": "SELECT * FROM (WITH orders AS (SELECT 1) SELECT * FROM orders) x JOIN orders ON true",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression reads the table it shadows",
+      "sql": "WITH orders AS (SELECT * FROM orders) SELECT * FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression is not visible to the one before it",
+      "sql": "WITH b AS (SELECT * FROM items), items AS (SELECT 1) SELECT * FROM items JOIN b ON true",
+      "op": "SELECT",
+      "tables": ["items"]
+    },
+    {
+      "name": "common table expression is visible to the one after it",
+      "sql": "WITH a AS (SELECT 1), b AS (SELECT * FROM a) SELECT * FROM b",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "WITH RECURSIVE expression reads itself",
+      "sql": "WITH RECURSIVE t AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM t WHERE n < 2) SELECT * FROM t",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "quoted common table expression name keeps its case",
+      "sql": "WITH \"Orders\" AS (SELECT 1) SELECT * FROM orders",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "unquoted common table expression name folds to lower case",
+      "sql": "WITH ORDERS AS (SELECT 1) SELECT * FROM \"orders\"",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "ONLY with parentheses around the name",
+      "sql": "SELECT 1 FROM ONLY (orders)",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of a DELETE",
+      "sql": "WITH orders AS (SELECT 1) DELETE FROM orders",
+      "op": "DELETE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of an UPDATE",
+      "sql": "WITH orders AS (SELECT 1) UPDATE orders SET id = 1",
+      "op": "UPDATE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of an INSERT",
+      "sql": "WITH orders AS (SELECT 1) INSERT INTO orders VALUES (1)",
+      "op": "INSERT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of a MERGE",
+      "sql": "WITH orders AS (SELECT 1 AS id) MERGE INTO orders USING items ON true WHEN MATCHED THEN DELETE",
+      "op": "MERGE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression does not hide the table of a write in a later expression",
+      "sql": "WITH orders AS (SELECT 1 AS id), gone AS (DELETE FROM orders RETURNING id) SELECT * FROM gone",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "common table expression hides what a write reads",
+      "sql": "WITH a AS (SELECT 1 AS id) INSERT INTO orders SELECT id FROM a",
+      "op": "INSERT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "WITH ORDINALITY AS is not a common table expression",
+      "sql": "SELECT * FROM unnest(ARRAY[1]) WITH ORDINALITY AS t JOIN ordinality ON true",
+      "op": "SELECT",
+      "tables": ["unnest", "ordinality"]
+    },
+    {
+      "name": "statements joined by a semicolon read as one statement",
+      "sql": "WITH a AS (SELECT 1) SELECT * FROM a; SELECT * FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "unquoted name keeps the case of a non-ASCII letter",
+      "sql": "WITH É AS (SELECT 1) SELECT * FROM é",
+      "op": "SELECT",
+      "tables": ["é"]
+    },
+    {
+      "name": "quoted and unquoted name with the same non-ASCII letter match",
+      "sql": "WITH \"É\" AS (SELECT 1) SELECT * FROM É",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "op of a statement in parentheses",
+      "sql": "(SELECT 1 FROM orders)",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "op of a WITH statement in parentheses",
+      "sql": "((WITH a AS (SELECT * FROM items) SELECT * FROM a))",
+      "op": "SELECT",
+      "tables": ["items"]
+    },
+    {
+      "name": "op of a set operation between parentheses",
+      "sql": "(SELECT 1 FROM orders) UNION (SELECT 1 FROM items)",
+      "op": "SELECT",
+      "tables": ["orders", "items"]
+    },
+    {
+      "name": "alias list named materialized after WITH ORDINALITY is not an expression",
+      "sql": "SELECT * FROM unnest(ARRAY[1]) WITH ORDINALITY materialized (v, n) JOIN ordinality ON true",
+      "op": "SELECT",
+      "tables": ["unnest", "ordinality"]
+    },
+    {
+      "name": "alias list after WITH ORDINALITY AS materialized is not an expression",
+      "sql": "SELECT * FROM unnest(ARRAY[1]) WITH ORDINALITY AS materialized (v, n) JOIN ordinality ON true",
+      "op": "SELECT",
+      "tables": ["unnest", "ordinality"]
+    },
+    {
+      "name": "expression named ordinality with a MATERIALIZED body",
+      "sql": "WITH ordinality AS MATERIALIZED (SELECT 1) SELECT * FROM ordinality",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "expression whose body starts with a parenthesis",
+      "sql": "WITH a AS ((SELECT 1)) SELECT * FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "expression whose body is VALUES",
+      "sql": "WITH a AS (VALUES (1)) SELECT * FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "column named delete before FROM reads the expression",
+      "sql": "WITH a AS (SELECT 1 AS delete) SELECT delete FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "DELETE inside an expression body writes a table of that name",
+      "sql": "WITH a AS (SELECT 1), gone AS (DELETE FROM a RETURNING *) SELECT * FROM gone",
+      "op": "SELECT",
+      "tables": ["a"]
+    },
+    {
+      "name": "UPDATE action of MERGE names no table",
+      "sql": "MERGE INTO orders USING (SELECT 1 AS id) AS src ON true WHEN MATCHED THEN UPDATE SET id = src.id",
+      "op": "MERGE",
+      "tables": ["orders"]
+    },
+    {
+      "name": "letter that capitalizes to ASCII does not make a keyword",
+      "sql": "WITH a AS (SELECT 1 AS joın) SELECT joın FROM a",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "op capitalizes only a to z",
+      "sql": "ßelect 1",
+      "op": "ßELECT",
+      "tables": []
+    },
+    {
+      "name": "op of a parenthesized statement after the expressions",
+      "sql": "WITH a AS (SELECT * FROM items) (SELECT * FROM a)",
+      "op": "SELECT",
+      "tables": ["items"]
+    },
+    {
+      "name": "op of parenthesized VALUES after the expressions",
+      "sql": "WITH a AS (SELECT 1) (VALUES (1))",
+      "op": "VALUES",
+      "tables": []
+    },
+    {
+      "name": "SEARCH clause belongs to its expression",
+      "sql": "WITH RECURSIVE t(n) AS (VALUES (1) UNION ALL SELECT n + 1 FROM t WHERE n < 2) SEARCH DEPTH FIRST BY n SET ord SELECT * FROM t",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "CYCLE clause belongs to its expression",
+      "sql": "WITH RECURSIVE t(n) AS (VALUES (1) UNION ALL SELECT n + 1 FROM t WHERE n < 2) CYCLE n SET is_cycle TO true DEFAULT false USING path SELECT * FROM t",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "expression list goes on after SEARCH and CYCLE",
+      "sql": "WITH RECURSIVE t(n, m) AS (VALUES (1, 1) UNION ALL SELECT n + 1, m FROM t WHERE n < 2) SEARCH BREADTH FIRST BY n, m SET ord CYCLE n, m SET is_cycle USING path, u AS (SELECT * FROM orders) SELECT * FROM t JOIN u ON true",
+      "op": "SELECT",
+      "tables": ["orders"]
+    },
+    {
+      "name": "reading a CYCLE clause stops at a parenthesis",
+      "sql": "WITH a AS (SELECT 1) CYCLE n (SELECT * FROM a) USING p",
+      "op": "SELECT",
+      "tables": []
+    },
+    {
+      "name": "known limit: unquoted column named update reads as a table keyword",
+      "sql": "SELECT update FROM orders",
+      "op": "SELECT",
+      "tables": ["FROM", "orders"]
+    }
+  ]
+}

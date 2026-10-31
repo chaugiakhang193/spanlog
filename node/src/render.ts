@@ -65,7 +65,7 @@ function baseLevel(event: SpanEvent): Level {
 }
 
 function frameOf(event: SpanEvent): string | undefined {
-  if (event.scope === undefined || event.method === undefined) {
+  if (!event.scope || !event.method) {
     return undefined;
   }
   return `${event.scope}.${event.method}`;
@@ -131,15 +131,15 @@ function errorText(err: ErrorInfo): string {
 
 function fieldsOf(event: SpanEvent): Record<string, unknown> {
   const fields: Record<string, unknown> = { service: event.service };
-  if (event.reqId !== undefined) fields.reqId = event.reqId;
-  if (event.scope !== undefined) fields.scope = event.scope;
-  if (event.method !== undefined) fields.method = event.method;
+  if (event.reqId) fields.reqId = event.reqId;
+  if (event.scope) fields.scope = event.scope;
+  if (event.method) fields.method = event.method;
   fields.action = event.action;
-  if (event.target !== undefined) fields.target = event.target;
+  if (event.target) fields.target = event.target;
   fields.phase = event.phase;
   if (event.durationMs !== undefined) fields.ms = roundMs(event.durationMs);
   if (event.status !== undefined) fields.status = event.status;
-  if (event.op !== undefined) fields.op = event.op;
+  if (event.op) fields.op = event.op;
   if (event.tables !== undefined) fields.tables = event.tables;
   if (event.err !== undefined) fields.err = errorFields(event, event.err);
   if (event.params !== undefined) fields.params = event.params;
@@ -178,7 +178,7 @@ function readableLine(
       ? `[${event.service}]`
       : `[${event.service}] [${frame}]`;
   const label = level.toUpperCase().padEnd(LEVEL_WIDTH);
-  return `${formatTime(event.time, utcOffsetMinutes)} ${label} ${owner} req=${event.reqId ?? '-'} ${tail}`;
+  return `${formatTime(event.time, utcOffsetMinutes)} ${label} ${owner} req=${event.reqId || '-'} ${tail}`;
 }
 
 // The first line of a V8 stack repeats name and message, which the main line

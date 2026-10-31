@@ -658,6 +658,35 @@
       }
     },
     {
+      "name": "params keep characters that JSON encoders can escape",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "call",
+        "target": "search.run",
+        "sameScope": false,
+        "phase": "START",
+        "params": { "q": "<a&b>\u2028\u2029" }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call search.run | START {\"q\":\"<a&b>\u2028\u2029\"}",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "call",
+          "target": "search.run",
+          "phase": "START",
+          "params": { "q": "<a&b>\u2028\u2029" }
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 INFO  [shop] req=7f3a9c call search.run | START {\"q\":\"<a&b>\u2028\u2029\"}"
+        ]
+      }
+    },
+    {
       "name": "explicit call done with a summary",
       "options": { "utcOffsetMinutes": 420 },
       "event": {
@@ -770,6 +799,128 @@
         },
         "lines": [
           "2026-10-24 19:45:03.120 +05:30 INFO  [shop] req=7f3a9c POST /orders | START"
+        ]
+      }
+    },
+    {
+      "name": "empty strings count as absent",
+      "options": {
+        "utcOffsetMinutes": 0
+      },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "",
+        "scope": "",
+        "method": "m",
+        "action": "run",
+        "target": "",
+        "phase": "START",
+        "op": ""
+      },
+      "expect": {
+        "level": "info",
+        "msg": "run | START",
+        "fields": {
+          "service": "shop",
+          "method": "m",
+          "action": "run",
+          "phase": "START"
+        },
+        "lines": [
+          "2026-10-24 14:15:03.120 +00:00 INFO  [shop] req=- run | START"
+        ]
+      }
+    },
+    {
+      "name": "negative duration rounds half up",
+      "options": {
+        "utcOffsetMinutes": 0
+      },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "action": "run",
+        "scope": "A",
+        "method": "b",
+        "phase": "DONE",
+        "durationMs": -1.25
+      },
+      "expect": {
+        "level": "info",
+        "msg": "A.b - run | DONE -1.2ms",
+        "fields": {
+          "service": "shop",
+          "scope": "A",
+          "method": "b",
+          "action": "run",
+          "phase": "DONE",
+          "ms": -1.2
+        },
+        "lines": [
+          "2026-10-24 14:15:03.120 +00:00 INFO  [shop] [A.b] req=- run | DONE -1.2ms"
+        ]
+      }
+    },
+    {
+      "name": "params keys sort by UTF-16 code unit",
+      "options": {
+        "utcOffsetMinutes": 0
+      },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "action": "call",
+        "target": "t",
+        "phase": "START",
+        "params": {
+          "": 1,
+          "𐀀": 2
+        }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call t | START {\"𐀀\":2,\"\":1}",
+        "fields": {
+          "service": "shop",
+          "action": "call",
+          "target": "t",
+          "phase": "START",
+          "params": {
+            "": 1,
+            "𐀀": 2
+          }
+        },
+        "lines": [
+          "2026-10-24 14:15:03.120 +00:00 INFO  [shop] req=- call t | START {\"𐀀\":2,\"\":1}"
+        ]
+      }
+    },
+    {
+      "name": "negative zero prints without a sign",
+      "options": { "utcOffsetMinutes": 0 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "action": "call",
+        "target": "t",
+        "phase": "DONE",
+        "durationMs": -0,
+        "summary": { "value": -0 }
+      },
+      "expect": {
+        "level": "info",
+        "msg": "call t | DONE 0ms {\"value\":0}",
+        "fields": {
+          "service": "shop",
+          "action": "call",
+          "target": "t",
+          "phase": "DONE",
+          "ms": -0,
+          "summary": { "value": -0 }
+        },
+        "lines": [
+          "2026-10-24 14:15:03.120 +00:00 INFO  [shop] req=- call t | DONE 0ms {\"value\":0}"
         ]
       }
     }

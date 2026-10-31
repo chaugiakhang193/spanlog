@@ -93,7 +93,8 @@ Detail:
 | `ABORTED` | `{ms}ms` | — |
 
 `{ms}` is the duration rounded to one decimal, without a trailing `.0`: `3ms`, `0.4ms`, `801ms`. JSON in a message
-(`params`, `summary`) is compact, with object keys sorted at every level.
+(`params`, `summary`) is compact, with object keys sorted by UTF-16 code unit at every level. An empty string in
+`reqId`, `scope`, `method`, `target` or `op` counts as absent.
 
 ## Readable line
 
@@ -137,7 +138,44 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
   lines of the old message, a later line of the old message that starts with whitespace and `at ` stays in the stack as
   a frame.
 
+### Errors in Go
+
+- An `error` has no `name`, so its line reads `FAILED 3ms stock not available`.
+- `err.stack` is captured when `done` writes the first report of the error. It starts with the name and message and
+  lists one frame per line as `at {function} ({file}:{line})`. A function that has already returned is not on it, so it
+  shows where the error was seen, which can be above where it was created.
+- A panic ends the call with `FAILED` and keeps going up with the same value. A panic value that is an `error`, a string,
+  a number or a boolean is described by its text. Any other value has the `name` `ThrownValue` and the redacted JSON of
+  the value as its `message`.
+- `UnreadableError` covers `Error()` or `errorMessage` panicking and a panic value that `encoding/json` cannot encode.
+- The same value seen again in the request counts as already reported, compared with `==` along its `Unwrap` chain. An
+  error wrapped with `%w` on its way up is found this way. An `errors.Join` counts only when every branch was reported.
+  `Is` methods play no part. The walk reads at most 32 errors, counting the failure itself, its wrappers and the branches
+  of a `Join`, and a nil from `Unwrap` does not count. A reported error past that limit is not found, and a `Join` with a
+  branch past it counts as new. A failure whose `Unwrap` panics counts as new.
+- Known limits: a shared sentinel such as `ErrNotFound`, returned a second time in a request by an unrelated call, counts
+  as already reported and has no stack. A value that cannot be compared, such as an error type that holds a slice, cannot
+  be recognized and can be reported with its stack more than once. `runtime.Goexit` leaves `done` nothing to see, so with
+  a nil error the call ends with `DONE`, and so does `panic(nil)` under `GODEBUG=panicnil=1`. Invalid UTF-8 in JSON becomes
+  U+FFFD.
+- Known limits of JSON text against Node.js: a `json.Number` or a custom `MarshalJSON` keeps its number as written, such
+  as `1e3`. An integer above 2^53 keeps every digit in Go. A Node.js `number` has already rounded it to the nearest value
+  it can hold, and a `BigInt` is written as a string.
+- Known limits of `Render` called with a duration that no timer measures: from `1e21` up, Go writes every digit where
+  Node.js writes `1e+21`, and an infinite duration reads `+Inf` where Node.js reads `Infinity`.
+- Known limits of the `net/http` middleware: `ABORTED` reads the request context, which `net/http` cancels when the
+  client closes the connection. A client that leaves while the request body is unread is not seen, and a client that
+  leaves right after a complete response can end the request with `ABORTED`. A deadline on the context is not an abort.
+  Register the middleware outside `http.TimeoutHandler`: inside it, the line shows what the handler wrote, and the 503 sent
+  to the client stays out of sight. A handler that hijacks the connection writes past the middleware, and the line shows
+  the last status it saw. A flush that fails counts as having sent the header, as `net/http` does. A custom writer that fails
+  before sending it and then sends a later status leaves the line with the earlier status.
+- `go/testdata/cases.json` is a copy of `spec/cases.json`, because the module zip holds only `go/`. A test fails when the
+  two differ.
+
 ## Query lines
+
+The Go module has no query lines. The `sql` list of [`spec/cases.json`](../spec/cases.json) is tested in Node.js only.
 
 - `op` is the first keyword of the statement in capitals. `START TRANSACTION` keeps both words. For a statement that
   starts with `WITH`, `op` is the keyword after the common table expressions. Parentheses before that keyword are
