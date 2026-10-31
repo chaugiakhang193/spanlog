@@ -1,7 +1,7 @@
 # Examples
 
-The example serves `POST /orders` and holds one book in stock. The first order succeeds with a slow payment. The
-second fails because the stock is gone. It writes at debug level, so calls within one class are visible.
+Both examples serve `POST /orders` and hold one book in stock. The first order succeeds with a slow payment. The second
+fails because the stock is gone. Both write at debug level, so calls within one class are visible.
 
 ## express-orders
 
@@ -22,3 +22,18 @@ curl -X POST localhost:3020/orders -H 'content-type: application/json' -d '{"sku
 ```
 
 `docker compose down` stops the database.
+
+## go-http
+
+Needs Go 1.26. It keeps the stock in memory and has no query lines, because the Go module has none.
+
+```bash
+cd examples/go-http
+go run .
+```
+
+In a second terminal, send the same order twice:
+
+```bash
+curl -X POST localhost:3021/orders -d '{"sku":"book","quantity":1}'
+```
