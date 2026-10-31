@@ -2,24 +2,112 @@
 
 Readable call-boundary logs for Node.js and Go.
 
-spanlog writes one line when a call starts and one line when it ends, with its duration, into the logger the
-application already uses. Incoming requests, calls between services and database queries share one line format in
-Node.js and in Go. There is no collector, dashboard or account to set up.
+```text
+2026-11-01 01:49:38.070 +07:00 INFO  [shop] req=89e32c2e POST /orders | START
+2026-11-01 01:49:38.071 +07:00 INFO  [shop] [OrderService.handleOrder] req=89e32c2e run | START
+2026-11-01 01:49:38.071 +07:00 INFO  [shop] [OrderService.handleOrder] req=89e32c2e call InventoryService.reserve | START
+2026-11-01 01:49:38.072 +07:00 DEBUG [shop] [InventoryService.reserve] req=89e32c2e query UPDATE inventory | START
+2026-11-01 01:49:38.074 +07:00 DEBUG [shop] [InventoryService.reserve] req=89e32c2e query UPDATE inventory | DONE 2.5ms
+2026-11-01 01:49:38.075 +07:00 ERROR [shop] [OrderService.handleOrder] req=89e32c2e call InventoryService.reserve | FAILED 3.6ms Error: stock not available
+    at InventoryService.reserve (file:///app/server.js:43:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async OrderService.handleOrder (file:///app/server.js:63:5)
+    at async file:///app/server.js:110:17
+2026-11-01 01:49:38.076 +07:00 INFO  [shop] [OrderService.handleOrder] req=89e32c2e run | FAILED 5.1ms Error: stock not available
+2026-11-01 01:49:38.077 +07:00 WARN  [shop] req=89e32c2e POST /orders | FAILED 500 6.9ms
+```
 
-## Goals
+This is one request from [`examples/express-orders`](examples/express-orders/server.js), without the lines of one
+internal call. Stack paths are shortened.
 
-- **Logs, not traces.** Plain lines in the application's own logger, readable in a terminal and searchable with
-  `grep "| FAILED"`.
-- **One format for Node.js and Go.** Both implementations follow the same specification and are tested against the
-  same sample lines.
-- **Install once.** A middleware and one wrapper per service in Express. A `Start` call with `defer` in Go.
-- **Safe defaults.** Arguments, results and SQL text stay out of the logs unless enabled. Each error is logged once,
-  with its stack. An error's message is written as it is and can repeat a value, as a database error can repeat a SQL
-  parameter. The `errorMessage` option replaces it.
+spanlog writes one line when a call starts and one line when it ends, with its duration, into the logger the application
+already uses. There is no collector, dashboard or account to set up.
+
+## Install
+
+The package and the module have no release. Build from a clone:
+
+```bash
+git clone https://github.com/chaugiakhang193/spanlog.git
+npm --prefix spanlog/node ci
+npm --prefix spanlog/node run build
+npm install ./spanlog/node
+```
+
+For Go, in your `go.mod`:
+
+```
+require github.com/chaugiakhang193/spanlog/go v0.0.0
+
+replace github.com/chaugiakhang193/spanlog/go => ./spanlog/go
+```
+
+## Use
+
+Express, once per application and once per service:
+
+```js
+const log = createSpanlog({ service: 'shop' });
+const orders = log.traced(new OrderService(), 'OrderService');
+app.use(logRequests(log));
+```
+
+Go, once per application and once per method:
+
+```go
+logger := spanlog.New(spanlog.Options{Service: "shop"})
+http.ListenAndServe(address, logger.Middleware(mux))
+
+func (s *OrderService) HandleOrder(ctx context.Context) (err error) {
+	ctx, done := s.log.Start(ctx, "OrderService", "HandleOrder")
+	defer done(&err)
+	return s.inventory.Reserve(ctx)
+}
+```
+
+- [Node.js guide](docs/node.md)
+- [Go guide](docs/go.md)
+- [Log format](docs/log-format.md)
+- [Examples](examples/README.md)
+
+## What it covers
+
+| | Node.js | Go |
+|---|---|---|
+| Incoming requests | Express 5 | `net/http` |
+| Calls | `traced` wraps a whole object, `call` wraps one piece of work | `Start` in each method, `Call` wraps one piece of work |
+| Database queries | TypeORM 1.1, with the operation and table names | Not available |
+| Destinations | Readable text, JSON, pino | Readable text, JSON, slog |
+
+Both implementations follow one [specification](docs/log-format.md) and are tested against the same
+[sample lines](spec/cases.json).
+
+## Safe defaults
+
+- Arguments, results and SQL text stay out of the logs unless passed as `params` or `summary`.
+- Those two are redacted by key. A sensitive value in a plain string is not seen.
+- Each error is logged once per request, with its stack.
+- An error's message is written as it is and can repeat a value, as a database error can repeat a SQL parameter. The
+  `errorMessage` option replaces it.
+- The request line holds the real path without its query string. A path can hold personal data.
+
+## Other tools
+
+spanlog is not a logger. It decides which lines to write and hands them to a sink, and `pinoSink` and `SlogSink` keep
+pino or slog as the logger. Each tool below does more than spanlog in its own area. Pick spanlog when plain lines in your
+own logger are what you want.
+
+| Tool | Output | Setup | Scope |
+|---|---|---|---|
+| spanlog | Lines in the application's logger | Middleware, one wrapper per service | Express and `net/http`, TypeORM queries in Node.js |
+| [`pino`](https://www.npmjs.com/package/pino) 10.4.0 with [`pino-http`](https://www.npmjs.com/package/pino-http) 11.0.0 | JSON lines, one per finished request with `responseTime` | A logger and a middleware | Calls and queries are logged by hand through `req.log` |
+| [`@nestjs/observe`](https://www.npmjs.com/package/@nestjs/observe) 0.3.21 | Traces in a hosted dashboard, with an app key and secret | One module and one option in `NestFactory.create`. Every provider is instrumented by default | NestJS, with queries of `pg`, `mysql2`, `mssql`, `mongodb` |
+| [OpenTelemetry](https://opentelemetry.io) | Spans sent to the backend of your choice | SDK, instrumentations and an exporter | Many languages and libraries. `@opentelemetry/instrumentation-typeorm` 0.24.0 records the statement text |
+| [`nestlogged`](https://www.npmjs.com/package/nestlogged) 3.7.3 | Lines through the NestJS logger | A decorator on each class | NestJS |
 
 ## Status
 
-Early development. The line format, the Node.js package and the Go module have no release.
+Early development. Fields and options can change before 1.0.
 
 ## License
 
