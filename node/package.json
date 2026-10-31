@@ -18,6 +18,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "default": "./dist/express.js"
     }
   },
   "files": [
@@ -31,8 +35,18 @@
     "format": "prettier --write \"src/**/*.ts\" \"*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"*.ts\""
   },
+  "peerDependencies": {
+    "express": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@types/express": "5.0.6",
     "@types/node": "24.19.2",
+    "express": "5.3.0",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "vitest": "4.1.12"

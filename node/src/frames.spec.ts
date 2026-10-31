@@ -13,6 +13,8 @@ describe('withoutOwnFrames', () => {
         'at async spanlogTrack (file:///app/node_modules/spanlog/dist/spanlog.js:2:2)',
         'at Inner.spanlogWrapped (C:\\app\\node_modules\\spanlog\\src\\spanlog.ts:3:3)',
         'at async Outer.run (file:///app/outer.js:9:5)',
+        'at spanlogEnterRequest (file:///app/node_modules/spanlog/dist/express.js:4:4)',
+        'at spanlogMiddleware (file:///app/node_modules/spanlog/dist/express.js:5:5)',
       ]),
     ).toEqual([
       'at Inner.fail (file:///app/inner.js:3:11)',

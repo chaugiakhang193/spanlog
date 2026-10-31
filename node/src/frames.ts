@@ -7,7 +7,9 @@
 const OWN_FUNCTIONS = [
   'spanlogCall',
   'spanlogEnter',
+  'spanlogEnterRequest',
   'spanlogInvoke',
+  'spanlogMiddleware',
   'spanlogRunInContext',
   'spanlogTrack',
   'spanlogWithRequest',
