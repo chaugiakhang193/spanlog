@@ -1,6 +1,6 @@
 # spanlog
 
-Readable call-boundary logs for Node.js and Go.
+Readable call-boundary logs for Node.js, Go and Python.
 
 ```text
 2026-11-01 01:49:38.070 +07:00 INFO  [shop] req=89e32c2e POST /orders | START
@@ -42,6 +42,12 @@ require github.com/chaugiakhang193/spanlog/go v0.0.0
 replace github.com/chaugiakhang193/spanlog/go => ./spanlog/go
 ```
 
+For Python:
+
+```bash
+pip install ./spanlog/python
+```
+
 ## Use
 
 Express, once per application and once per service:
@@ -65,21 +71,30 @@ func (s *OrderService) HandleOrder(ctx context.Context) (err error) {
 }
 ```
 
+FastAPI, once per application and once per service. Flask has the same two lines through `spanlog.wsgi`:
+
+```python
+log = Spanlog(service="shop")
+orders = log.traced(OrderService(), "OrderService")
+app.add_middleware(LogRequests, log=log)
+```
+
 - [Node.js guide](docs/node.md)
 - [Go guide](docs/go.md)
+- [Python guide](docs/python.md)
 - [Log format](docs/log-format.md)
 - [Examples](examples/README.md)
 
 ## What it covers
 
-| | Node.js | Go |
-|---|---|---|
-| Incoming requests | Express 5 | `net/http` |
-| Calls | `traced` wraps a whole object, `call` wraps one piece of work | `Start` in each method, `Call` wraps one piece of work |
-| Database queries | TypeORM 1.1, with the operation and table names | Not available |
-| Destinations | Readable text, JSON, pino | Readable text, JSON, slog |
+| | Node.js | Go | Python |
+|---|---|---|---|
+| Incoming requests | Express 5 | `net/http` | ASGI (FastAPI, Starlette), WSGI (Flask) |
+| Calls | `traced` wraps a whole object, `call` wraps one piece of work | `Start` in each method, `Call` wraps one piece of work | `traced` wraps a whole object, `call` and `acall` wrap one piece of work |
+| Database queries | TypeORM 1.1, with the operation and table names | Not available | Not available |
+| Destinations | Readable text, JSON, pino | Readable text, JSON, slog | Readable text, JSON, `logging` |
 
-Both implementations follow one [specification](docs/log-format.md) and are tested against the same
+All implementations follow one [specification](docs/log-format.md) and are tested against the same
 [sample lines](spec/cases.json).
 
 ## Safe defaults
@@ -93,13 +108,13 @@ Both implementations follow one [specification](docs/log-format.md) and are test
 
 ## Other tools
 
-spanlog is not a logger. It decides which lines to write and hands them to a sink, and `pinoSink` and `SlogSink` keep
-pino or slog as the logger. Each tool below does more than spanlog in its own area. Pick spanlog when plain lines in your
+spanlog is not a logger. It decides which lines to write and hands them to a sink, and `pinoSink`, `SlogSink` and
+`logging_sink` keep pino, slog or `logging` as the logger. Each tool below does more than spanlog in its own area. Pick spanlog when plain lines in your
 own logger are what you want.
 
 | Tool | Output | Setup | Scope |
 |---|---|---|---|
-| spanlog | Lines in the application's logger | Middleware, one wrapper per service | Express and `net/http`, TypeORM queries in Node.js |
+| spanlog | Lines in the application's logger | Middleware, one wrapper per service | Express, `net/http`, ASGI and WSGI, TypeORM queries in Node.js |
 | [`pino`](https://www.npmjs.com/package/pino) 10.4.0 with [`pino-http`](https://www.npmjs.com/package/pino-http) 11.0.0 | JSON lines, one per finished request with `responseTime` | A logger and a middleware | Calls and queries are logged by hand through `req.log` |
 | [`@nestjs/observe`](https://www.npmjs.com/package/@nestjs/observe) 0.3.21 | Traces in a hosted dashboard, with an app key and secret | One module and one option in `NestFactory.create`. Every provider is instrumented by default | NestJS, with queries of `pg`, `mysql2`, `mssql`, `mongodb` |
 | [OpenTelemetry](https://opentelemetry.io) | Spans sent to the backend of your choice | SDK, instrumentations and an exporter | Many languages and libraries. `@opentelemetry/instrumentation-typeorm` 0.24.0 records the statement text |
