@@ -1,7 +1,7 @@
 # Log format
 
-Specification version 0 (draft). The Node.js and Go implementations follow this document and are tested against the
-sample cases in [`spec/cases.json`](../spec/cases.json). Fields and phases may change before 1.0. Every change is
+Specification version 0 (draft). The Node.js, Go and Python implementations follow this document and are tested against
+the sample cases in [`spec/cases.json`](../spec/cases.json). Fields and phases may change before 1.0. Every change is
 listed in the release notes.
 
 ## Events
@@ -175,7 +175,8 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
 
 ## Query lines
 
-The Go module has no query lines. The `sql` list of [`spec/cases.json`](../spec/cases.json) is tested in Node.js only.
+The Go module and the Python package have no query lines. The `sql` list of [`spec/cases.json`](../spec/cases.json) is
+tested in Node.js only.
 
 - `op` is the first keyword of the statement in capitals. `START TRANSACTION` keeps both words. For a statement that
   starts with `WITH`, `op` is the keyword after the common table expressions. Parentheses before that keyword are
