@@ -173,6 +173,21 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
 - `go/testdata/cases.json` is a copy of `spec/cases.json`, because the module zip holds only `go/`. A test fails when the
   two differ.
 
+### Errors in Python
+
+- `name` is the class of the exception, so its line reads `FAILED 3ms ValueError: stock not available`.
+- `err.stack` starts with the name and the first line of the message and lists one frame per line as
+  `at {qualified name} ({file}:{line})`, innermost first, at most 32. A Python traceback holds the frames from the function
+  that caught the exception down to the raise, so the frames that called the wrapped method are not on it.
+- Python raises only exceptions, so `ThrownValue` does not occur. `UnreadableError` covers `__str__` or `error_message`
+  raising.
+- Every `BaseException` ends the call with `FAILED` and keeps going up, `asyncio.CancelledError` included. A cancelled
+  request ends with `ABORTED`.
+- The same exception object seen again in the request counts as already reported. `raise New() from old` is a new object
+  and is reported with its own stack.
+- Known limits of JSON text against Node.js: an integer above 2^53 keeps every digit, as in Go. A `Render` duration of
+  infinity reads `null` where Node.js reads `Infinity`.
+
 ## Query lines
 
 The Go module and the Python package have no query lines. The `sql` list of [`spec/cases.json`](../spec/cases.json) is
