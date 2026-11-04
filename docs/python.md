@@ -137,6 +137,8 @@ the operation and the table names, in the frame that runs it. A slow or failed s
 and its parameters stay out. `log_queries` returns a function that removes the listeners. Calling it twice on one engine
 writes every line twice.
 
+A full example is in [`examples/fastapi-orders`](../examples/fastapi-orders/server.py).
+
 ## What stays out of the logs
 
 Arguments and results stay out unless passed as `params` or through `summarize`, which are redacted by key. A sensitive
@@ -147,6 +149,9 @@ exception is written as it is, and `error_message` replaces it.
 
 The text of a SQLAlchemy `StatementError` holds the SQL and its parameters, so its line uses the first line of the error of
 the driver instead. That line can still repeat a value, as Postgres does in `invalid input syntax for type integer: "..."`.
+An exception that leaves the application reaches the server, which logs its full text outside spanlog. uvicorn does that
+for a SQLAlchemy error, SQL and parameters included. The example answers `SQLAlchemyError` in an exception handler for
+that reason.
 
 ## Known limits
 

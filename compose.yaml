@@ -1,7 +1,7 @@
 name: spanlog
 
-# Database for the integration tests of the Node TypeORM adapter and for
-# examples/express-orders. The data lives in memory and is gone when the
+# Database for the integration tests of the database adapters and for
+# examples/express-orders and examples/fastapi-orders. The data lives in memory and is gone when the
 # container stops. The credentials only open this local test database.
 services:
   postgres:
