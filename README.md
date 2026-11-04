@@ -91,7 +91,7 @@ app.add_middleware(LogRequests, log=log)
 |---|---|---|---|
 | Incoming requests | Express 5 | `net/http` | ASGI (FastAPI, Starlette), WSGI (Flask) |
 | Calls | `traced` wraps a whole object, `call` wraps one piece of work | `Start` in each method, `Call` wraps one piece of work | `traced` wraps a whole object, `call` and `acall` wrap one piece of work |
-| Database queries | TypeORM 1.1, with the operation and table names | Not available | Not available |
+| Database queries | TypeORM 1.1, with the operation and table names | Not available | SQLAlchemy 2, with the operation and table names |
 | Destinations | Readable text, JSON, pino | Readable text, JSON, slog | Readable text, JSON, `logging` |
 
 All implementations follow one [specification](docs/log-format.md) and are tested against the same
@@ -114,7 +114,7 @@ own logger are what you want.
 
 | Tool | Output | Setup | Scope |
 |---|---|---|---|
-| spanlog | Lines in the application's logger | Middleware, one wrapper per service | Express, `net/http`, ASGI and WSGI, TypeORM queries in Node.js |
+| spanlog | Lines in the application's logger | Middleware, one wrapper per service | Express, `net/http`, ASGI and WSGI, TypeORM and SQLAlchemy queries |
 | [`pino`](https://www.npmjs.com/package/pino) 10.4.0 with [`pino-http`](https://www.npmjs.com/package/pino-http) 11.0.0 | JSON lines, one per finished request with `responseTime` | A logger and a middleware | Calls and queries are logged by hand through `req.log` |
 | [`@nestjs/observe`](https://www.npmjs.com/package/@nestjs/observe) 0.3.21 | Traces in a hosted dashboard, with an app key and secret | One module and one option in `NestFactory.create`. Every provider is instrumented by default | NestJS, with queries of `pg`, `mysql2`, `mssql`, `mongodb` |
 | [OpenTelemetry](https://opentelemetry.io) | Spans sent to the backend of your choice | SDK, instrumentations and an exporter | Many languages and libraries. `@opentelemetry/instrumentation-typeorm` 0.24.0 records the statement text |

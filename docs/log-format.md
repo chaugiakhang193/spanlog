@@ -185,13 +185,15 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
   request ends with `ABORTED`.
 - The same exception object seen again in the request counts as already reported. `raise New() from old` is a new object
   and is reported with its own stack.
+- A SQLAlchemy `StatementError` uses the first line of the error of the driver as its `message`, because its own text holds
+  the SQL and the parameters. `error_message` still replaces it.
 - Known limits of JSON text against Node.js: an integer above 2^53 keeps every digit, as in Go. A `Render` duration of
   infinity reads `null` where Node.js reads `Infinity`.
 
 ## Query lines
 
-The Go module and the Python package have no query lines. The `sql` list of [`spec/cases.json`](../spec/cases.json) is
-tested in Node.js and Python.
+The Go module has no query lines. The `sql` list of [`spec/cases.json`](../spec/cases.json) is tested in Node.js and
+Python.
 
 - `op` is the first keyword of the statement in capitals. `START TRANSACTION` keeps both words. For a statement that
   starts with `WITH`, `op` is the keyword after the common table expressions. Parentheses before that keyword are

@@ -29,10 +29,32 @@ def error_info(
     """
     try:
         name = type(failure).__name__
-        message = str(failure) if error_message is None else error_message(failure)
+        message = _message_of(failure) if error_message is None else error_message(failure)
         return ErrorInfo(name=name, message=message, stack=_stack_text(name, message, failure))
     except Exception:
         return _UNREADABLE
+
+
+# str() of a SQLAlchemy StatementError holds the SQL text and the parameters, and
+# hide_parameters=True still leaves the SQL text. SQLAlchemy appends both after the text of
+# the driver error. The message is the first line of that text. psycopg and asyncpg add
+# later lines, such as DETAIL, that can repeat a value. Without a driver error the SQL text
+# starts on the second line of str().
+def _message_of(failure: BaseException) -> str:
+    if not _is_statement_error(failure):
+        return str(failure)
+    driver_error = getattr(failure, "orig", None)
+    source = failure if driver_error is None else driver_error
+    return str(source).split("\n", 1)[0]
+
+
+# The core package does not import SQLAlchemy. The class is matched by module and name in
+# the MRO, which also covers DBAPIError and its subclasses.
+def _is_statement_error(failure: BaseException) -> bool:
+    return any(
+        cls.__module__ == "sqlalchemy.exc" and cls.__name__ == "StatementError"
+        for cls in type(failure).__mro__
+    )
 
 
 # A traceback lists the frames from the catching function down to the raise. The stack

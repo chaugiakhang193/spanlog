@@ -121,6 +121,22 @@ carry it. `threading.Thread` and `ThreadPoolExecutor.submit` start with an empty
 - `logging_sink(logger)` hands the message to a `logging.Logger`, with the fields as attributes of the record.
 - A sink is any object with `write(rendered)`.
 
+## Database queries
+
+`pip install "./spanlog/python[sqlalchemy]"`, then call `log_queries` once per engine:
+
+```python
+from spanlog.sqlalchemy import log_queries
+
+log = Spanlog(service="shop", level="debug")
+log_queries(engine, log)
+```
+
+`engine` is an `Engine` or an `AsyncEngine`. Each SQL statement writes a START line and an end line at debug level, with
+the operation and the table names, in the frame that runs it. A slow or failed statement appears at warn. The SQL text
+and its parameters stay out. `log_queries` returns a function that removes the listeners. Calling it twice on one engine
+writes every line twice.
+
 ## What stays out of the logs
 
 Arguments and results stay out unless passed as `params` or through `summarize`, which are redacted by key. A sensitive
@@ -129,9 +145,18 @@ dates, `Decimal`, `UUID`, paths and enums. `bytes` is written as `[BYTES n]` and
 because its `repr` can hold anything. `target` of a request holds the real path, query string removed. The text of an
 exception is written as it is, and `error_message` replaces it.
 
+The text of a SQLAlchemy `StatementError` holds the SQL and its parameters, so its line uses the first line of the error of
+the driver instead. That line can still repeat a value, as Postgres does in `invalid input syntax for type integer: "..."`.
+
 ## Known limits
 
-- The package writes no query lines.
+- `BEGIN`, `COMMIT` and `ROLLBACK` of a SQLAlchemy transaction write no line, because SQLAlchemy has no event after the
+  driver call. A `ROLLBACK` sent as a statement writes one at warn level.
+- An ORM insert that SQLAlchemy splits into batches writes one pair of lines per batch. `executemany` writes one pair.
+- The asyncpg dialect of SQLAlchemy puts the class of the driver error in front of its message, so the line reads
+  `IntegrityError: <class 'asyncpg.exceptions.UniqueViolationError'>: duplicate key ...`.
+- `log_queries` uses `event.remove` to detach, which SQLAlchemy does not allow while a statement of that engine is running.
+  A statement running at that moment keeps its START line without an end line.
 - ASGI: the middleware sees a client that left when the application reads a disconnect or when one is waiting right before
   the last byte of the response. A client that leaves after that point is not seen. The check needs asyncio, and it can take
   a part of the request body that nothing has read. A server on trio skips it. Other scope types, such as websockets, pass
@@ -143,5 +168,6 @@ exception is written as it is, and `error_message` replaces it.
 
 ## Tested versions
 
-Python 3.14.6 on Windows, FastAPI 0.162.0, Starlette 1.10.0, uvicorn 0.54.0, Flask 3.1.3, waitress 3.0.2. Older versions,
+Python 3.14.6 on Windows, FastAPI 0.162.0, Starlette 1.10.0, uvicorn 0.54.0, Flask 3.1.3, waitress 3.0.2, SQLAlchemy 2.1.6 with
+psycopg 3.3.6 and asyncpg 0.32.0 on Postgres 18.6, SQLite. Older versions,
 other operating systems and other servers have not been run.

@@ -1,6 +1,13 @@
 """Readable call-boundary logs. See docs/log-format.md."""
 
-from ._core import DEFAULT_SLOW_MS, RequestSpan, Spanlog, SpanlogWarning, get_request_id
+from ._core import (
+    DEFAULT_SLOW_MS,
+    QuerySpan,
+    RequestSpan,
+    Spanlog,
+    SpanlogWarning,
+    get_request_id,
+)
 from ._model import ErrorInfo, Rendered, SpanEvent
 from ._redact import CIRCULAR, DEFAULT_REDACT_KEYS, REDACTED, TRUNCATED, redact
 from ._render import render
@@ -13,6 +20,7 @@ __all__ = [
     "REDACTED",
     "TRUNCATED",
     "ErrorInfo",
+    "QuerySpan",
     "Rendered",
     "RequestSpan",
     "SpanEvent",

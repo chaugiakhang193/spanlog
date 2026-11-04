@@ -12,10 +12,11 @@ from typing import Any, TypeVar, cast
 
 from ._context import Frame, RequestScope, SpanContext, current_context
 from ._failure import describe_thrown, error_info, without_own_frames
-from ._model import Action, Level, Phase, SpanEvent
+from ._model import Action, ErrorInfo, Level, Phase, SpanEvent
 from ._redact import redact
 from ._render import level_for, render
 from ._sinks import SpanSink, pretty_sink
+from ._sql import query_target, summarize_sql
 
 T = TypeVar("T")
 
@@ -54,6 +55,24 @@ class RequestSpan:
 
     def abort(self) -> None:
         self._write_end(phase="ABORTED")
+
+
+class QuerySpan:
+    """Ends the lines opened by start_query. Only the first end or fail writes."""
+
+    def __init__(
+        self, write_end: Callable[..., None], read_error: Callable[[BaseException], ErrorInfo]
+    ) -> None:
+        self._write_end = write_end
+        self._read_error = read_error
+
+    def end(self) -> None:
+        self._write_end()
+
+    # A failed statement is not marked as reported. The frame that receives the
+    # exception writes it with its stack.
+    def fail(self, failure: BaseException) -> None:
+        self._write_end(phase="FAILED", err=self._read_error(failure))
 
 
 def get_request_id() -> str | None:
@@ -355,6 +374,27 @@ class Spanlog:
         start_line = self._event(_Owner(action="request", target=target), req_id, "START")
         self._emit(start_line)
         return RequestSpan(self._end_once(start_line))
+
+    def start_query(self, sql: str) -> QuerySpan:
+        """Write the START line of a SQL statement. Database adapters call it.
+
+        The line keeps the op and the table names and drops the rest of sql.
+        """
+        context = current_context.get()
+        frame = None if context is None else context.frame
+        summary = summarize_sql(sql)
+        owner = _Owner(
+            action="query",
+            scope=None if frame is None else frame.scope,
+            method=None if frame is None else frame.method,
+            target=query_target(summary),
+        )
+        req_id = None if context is None else context.request.req_id
+        start_line = self._event(owner, req_id, "START", op=summary.op, tables=summary.tables)
+        self._emit(start_line)
+        return QuerySpan(
+            self._end_once(start_line), lambda failure: error_info(failure, self._error_message)
+        )
 
 
 def _enter(scope: str, method: str) -> tuple[_Owner, SpanContext]:
