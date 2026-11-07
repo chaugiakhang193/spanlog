@@ -155,8 +155,17 @@ that reason.
 
 ## Known limits
 
-- `BEGIN`, `COMMIT` and `ROLLBACK` of a SQLAlchemy transaction write no line, because SQLAlchemy has no event after the
-  driver call. A `ROLLBACK` sent as a statement writes one at warn level.
+- `BEGIN` and `COMMIT` of a SQLAlchemy transaction write no line, because SQLAlchemy runs them through the driver and
+  has no event after the call. The rollback of a transaction, at the end of `engine.begin()` that raises or in
+  `Session.rollback()`, writes a `ROLLBACK` pair that names the tables it undoes. It writes nothing when the
+  transaction wrote no table, because SQLAlchemy also rolls back every connection that closes without a commit, reads
+  included, and nothing on a connection in `AUTOCOMMIT`. SQLAlchemy 2.0.43 added `detect_autocommit_setting`. An older
+  version, or a dialect that does not implement it, is taken as not in autocommit, and its rollback in `AUTOCOMMIT` still
+  writes the pair. To time the rollback, `log_queries` wraps `do_rollback` on the dialect of the engine until the
+  returned function runs. Engines made with `execution_options` share that dialect. A `ROLLBACK` sent as a statement
+  writes its pair like any statement. When another listener of the `rollback` event runs a statement on a second
+  connection, the rollback of that second connection reaches `do_rollback` first on the same thread, and the rollback
+  that undoes the writes writes no pair.
 - An ORM insert that SQLAlchemy splits into batches writes one pair of lines per batch. `executemany` writes one pair.
 - The asyncpg dialect of SQLAlchemy puts the class of the driver error in front of its message, so the line reads
   `IntegrityError: <class 'asyncpg.exceptions.UniqueViolationError'>: duplicate key ...`.

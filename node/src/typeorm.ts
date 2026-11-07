@@ -4,8 +4,10 @@ import type {
   BeforeQueryEvent,
   DataSource,
   EntitySubscriberInterface,
+  QueryRunner,
 } from 'typeorm';
 import type { QuerySpan, Spanlog } from './spanlog.js';
+import { TransactionTables } from './transaction-tables.js';
 
 /**
  * logQueries adds a subscriber to dataSource that writes a START line before
@@ -20,6 +22,12 @@ import type { QuerySpan, Spanlog } from './spanlog.js';
  * array. An event already being broadcast finishes iterating its original array, and
  * later broadcasts read the current property. Code that adds a subscriber after that
  * call reads the property again.
+ *
+ * The ROLLBACK line names the tables written in the transaction of its
+ * QueryRunner, or since the last savepoint for ROLLBACK TO SAVEPOINT, following
+ * the query lines of docs/log-format.md. The list starts at a BEGIN or START
+ * TRANSACTION that the subscriber sees. The ROLLBACK of a transaction that
+ * started before the subscriber was added names no table.
  *
  * A statement that another subscriber stops in beforeQuery also keeps its START
  * line without an end line. So does the attempt that CockroachDB fails with error
@@ -84,6 +92,9 @@ class QuerySubscriber implements EntitySubscriberInterface {
   // leave the span in the code that called query, and only this subscriber reads
   // the store.
   private readonly runningQuery = new AsyncLocalStorage<RunningQuery>();
+  // TypeORM 1.1 runs a transaction on one QueryRunner, which holds one
+  // connection. Two transactions running at once have two QueryRunners.
+  private readonly transactions = new WeakMap<QueryRunner, TransactionTables>();
   private disposed = false;
 
   constructor(private readonly log: Spanlog) {}
@@ -95,7 +106,10 @@ class QuerySubscriber implements EntitySubscriberInterface {
     if (this.disposed) {
       return;
     }
-    const span = this.log.startQuery(event.query);
+    const rolledBackTables = this.transactionOf(
+      event.queryRunner,
+    ).statementStarting(event.query);
+    const span = this.log.startQuery(event.query, rolledBackTables);
     if (this.disposed) {
       return;
     }
@@ -109,6 +123,9 @@ class QuerySubscriber implements EntitySubscriberInterface {
   afterQuery(event: AfterQueryEvent): void {
     if (this.disposed) {
       return;
+    }
+    if (event.success) {
+      this.transactionOf(event.queryRunner).statementDone(event.query);
     }
     const running = this.runningQuery.getStore();
     if (running?.query !== event.query) {
@@ -129,5 +146,14 @@ class QuerySubscriber implements EntitySubscriberInterface {
     }
     this.disposed = true;
     this.runningQuery.disable();
+  }
+
+  private transactionOf(queryRunner: QueryRunner): TransactionTables {
+    let transaction = this.transactions.get(queryRunner);
+    if (transaction === undefined) {
+      transaction = new TransactionTables();
+      this.transactions.set(queryRunner, transaction);
+    }
+    return transaction;
   }
 }

@@ -208,3 +208,54 @@ def test_psycopg_failed_statement_holds_no_sql_or_parameters(sync_engine):
         recording.log.traced(Repo(), "Repo").add()
     assert "DETAIL" in str(raised.value.orig)
     assert_statement_error_is_clean(recording)
+
+
+def test_asyncpg_rolled_back_transaction_names_the_table():
+    recording = Recording()
+
+    async def body(engine):
+        log_queries(engine, recording.log)
+        with pytest.raises(RuntimeError):
+            async with engine.begin() as conn:
+                await conn.execute(insert(people).values(email="a"))
+                raise RuntimeError("payment declined")
+
+    in_async_tables(body)
+    rollback = [q for q in recording.queries() if q["op"] == "ROLLBACK"]
+    assert [(q["phase"], q["level"], q["tables"]) for q in rollback] == [
+        ("START", "debug", ["pg_people"]),
+        ("DONE", "warn", ["pg_people"]),
+    ]
+
+
+def test_psycopg_savepoint_rollback_names_only_its_writes(sync_engine):
+    recording = Recording()
+    log_queries(sync_engine, recording.log)
+    with sync_engine.begin() as conn:
+        conn.execute(insert(people).values(email="outer"))
+        with pytest.raises(RuntimeError), conn.begin_nested():
+            conn.execute(text("UPDATE pg_people SET email = 'inner'"))
+            raise RuntimeError("line rejected")
+    ends = [
+        (q["level"], q["target"])
+        for q in recording.queries()
+        if q["phase"] == "DONE" and q["op"] in ("ROLLBACK", "COMMIT", "SAVEPOINT")
+    ]
+    assert ends == [("debug", "SAVEPOINT"), ("warn", "ROLLBACK pg_people")]
+
+
+def test_psycopg_autocommit_engine_writes_no_rollback_line():
+    engine = create_engine(SYNC_URL, isolation_level="AUTOCOMMIT")
+    meta.drop_all(engine)
+    meta.create_all(engine)
+    recording = Recording()
+    log_queries(engine, recording.log)
+    try:
+        with engine.connect() as conn:
+            conn.execute(insert(people).values(email="kept"))
+        with engine.connect() as conn:
+            assert conn.execute(select(people.c.email)).scalars().all() == ["kept"]
+    finally:
+        meta.drop_all(engine)
+        engine.dispose()
+    assert "ROLLBACK" not in [q["op"] for q in recording.queries()]

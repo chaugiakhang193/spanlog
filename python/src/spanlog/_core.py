@@ -4,7 +4,7 @@ import functools
 import inspect
 import time
 import warnings
-from collections.abc import Awaitable, Callable, Iterable, Iterator
+from collections.abc import Awaitable, Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -16,7 +16,7 @@ from ._model import Action, ErrorInfo, Level, Phase, SpanEvent
 from ._redact import redact
 from ._render import level_for, render
 from ._sinks import SpanSink, pretty_sink
-from ._sql import query_target, summarize_sql
+from ._sql import SqlSummary, query_target, summarize_sql
 
 T = TypeVar("T")
 
@@ -375,14 +375,16 @@ class Spanlog:
         self._emit(start_line)
         return RequestSpan(self._end_once(start_line))
 
-    def start_query(self, sql: str) -> QuerySpan:
+    def start_query(self, sql: str, rolled_back_tables: Sequence[str] | None = None) -> QuerySpan:
         """Write the START line of a SQL statement. Database adapters call it.
 
-        The line keeps the op and the table names and drops the rest of sql.
+        The line keeps the op and the table names and drops the rest of sql. On a ROLLBACK,
+        rolled_back_tables replaces the tables read from sql, and the line names the tables
+        that the rollback undoes. Other statements ignore it.
         """
         context = current_context.get()
         frame = None if context is None else context.frame
-        summary = summarize_sql(sql)
+        summary = _with_rolled_back_tables(summarize_sql(sql), rolled_back_tables)
         owner = _Owner(
             action="query",
             scope=None if frame is None else frame.scope,
@@ -395,6 +397,16 @@ class Spanlog:
         return QuerySpan(
             self._end_once(start_line), lambda failure: error_info(failure, self._error_message)
         )
+
+
+# Only a ROLLBACK takes the tables of an adapter. Any other statement keeps the tables of its
+# own text.
+def _with_rolled_back_tables(
+    summary: SqlSummary, rolled_back_tables: Sequence[str] | None
+) -> SqlSummary:
+    if summary.op != "ROLLBACK" or rolled_back_tables is None:
+        return summary
+    return SqlSummary(summary.op, list(rolled_back_tables))
 
 
 def _enter(scope: str, method: str) -> tuple[_Owner, SpanContext]:

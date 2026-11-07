@@ -47,7 +47,7 @@ inside one process. Another process writes its own lines under its own `service`
 | `ms` | number | every phase except `START`. Duration in milliseconds, rounded to one decimal |
 | `status` | number | `request` lines with `DONE`, `SLOW` or `FAILED` |
 | `op` | string | `query`. See [Query lines](#query-lines) |
-| `tables` | string[] | `query`. Can be empty |
+| `tables` | string[] | `query`. Can be empty. On a `ROLLBACK`, the tables that the rollback undoes |
 | `err` | object | `FAILED` on `run`, `call`, `query`. `name` (optional), `message`, `stack` (see [Errors](#errors)) |
 | `params` | object | `START` of an explicit `call`, when parameters are given. Redacted |
 | `summary` | object | `DONE` and `SLOW` of an explicit `call`, when a summary is given. Redacted |
@@ -218,6 +218,24 @@ tested in Node.js and Python.
 - String literals (`'...'`, `E'...'` with its continuation lines, `$tag$...$tag$`) and comments (`-- ...`, `/* ... */`)
   are skipped unread. A name or a tag can hold any character from U+0080 up.
 - `target` is `{op}` followed by the tables joined with `, `, or `{op}` alone when there is no table.
+- On a `ROLLBACK`, `tables` lists the tables that the rollback undoes in place of the names in the statement. Each
+  connection keeps the tables of its `INSERT`, `UPDATE`, `DELETE` and `MERGE` statements that ended without an error,
+  from `BEGIN` or `START TRANSACTION` on, in the order first written, without duplicates. They can include a table
+  that such a statement only reads, such as the source of `INSERT ... SELECT`. `ROLLBACK` lists them all and drops
+  them. `COMMIT`, `END` and `ABORT` drop them without naming them, even when the statement fails, because Postgres
+  ends the transaction in that case too. The line of `ABORT` stays at debug. Statements outside a transaction are not
+  kept, and a `ROLLBACK` with no open transaction lists nothing. The list names tables, not rows.
+- `SAVEPOINT` inside a transaction starts a new list. `ROLLBACK TO SAVEPOINT`, with or without `WORK`, `TRANSACTION`
+  and `SAVEPOINT`, lists the tables written since the last savepoint and leaves that savepoint open with an empty list.
+  `RELEASE SAVEPOINT` adds its list to the one before. Both act on the last savepoint started, whatever name they
+  give. A `RELEASE` with no savepoint seen keeps the list as it is.
+- `COMMIT`, `END`, `ABORT` or `ROLLBACK` with `AND CHAIN` that ends without an error opens the next transaction with
+  an empty list, as Postgres does. `ROLLBACK AND CHAIN` still lists the tables it undoes. A chained statement that
+  fails opens nothing. `AND NO CHAIN` ends the transaction like the statement alone.
+- Known limits of the `ROLLBACK` list: it leaves out a write inside a common table expression of a `SELECT`, as well
+  as `TRUNCATE`, `COPY` and DDL. A `ROLLBACK TO` or `RELEASE` that names an earlier savepoint reads as the last one. A
+  `ROLLBACK TO` with no savepoint seen lists nothing. A `BEGIN` inside an open transaction, which Postgres ignores,
+  starts the list over.
 - Known limits: `FROM some_function(...)` reports the function name, `FROM` inside a call such as
   `EXTRACT(YEAR FROM created_at)` reports the column, a name after a comma (`FROM a, b`) or first inside parentheses
   (`FROM (a JOIN b ON true)`) is not listed, a backslash escape outside `E'...'`, as in MySQL, can end a literal

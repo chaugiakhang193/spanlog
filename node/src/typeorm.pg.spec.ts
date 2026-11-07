@@ -43,6 +43,16 @@ function shape(rendered: Rendered): string {
   return `${rendered.level} ${rendered.msg.replace(MS, 'Nms')}`;
 }
 
+function transactionEnds(lines: Rendered[]): string[] {
+  return lines
+    .filter(
+      (line) =>
+        line.fields.phase === 'DONE' &&
+        (line.fields.op === 'ROLLBACK' || line.fields.op === 'COMMIT'),
+    )
+    .map(shape);
+}
+
 function firstParameter(parameters: unknown): unknown {
   return Array.isArray(parameters) ? parameters[0] : undefined;
 }
@@ -89,6 +99,34 @@ class OrderRepository {
         manager.query('SELECT pg_sleep(0.05), COUNT(*) FROM orders'),
         manager.query('SELECT COUNT(*) FROM order_lines'),
       ]);
+    });
+  }
+
+  async placeAndFail(id: number, sku: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query('INSERT INTO orders (id, sku) VALUES ($1, $2)', [
+        id,
+        sku,
+      ]);
+      await manager.query(
+        'INSERT INTO order_lines (order_id, sku) VALUES ($1, $2)',
+        [id, sku],
+      );
+      await manager.query('SELECT COUNT(*) FROM orders');
+      throw new Error('stock gone');
+    });
+  }
+
+  async placeWithBadLine(id: number, sku: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query('INSERT INTO orders (id, sku) VALUES ($1, $2)', [
+        id,
+        sku,
+      ]);
+      await manager.query(
+        "INSERT INTO order_lines (order_id, sku) VALUES ('not a number', $1)",
+        [sku],
+      );
     });
   }
 }
@@ -192,6 +230,89 @@ describe('logQueries on Postgres', () => {
         line.fields.target === 'SELECT orders' && line.fields.phase === 'DONE',
     );
     expect(Number(slowOne?.fields.ms)).toBeGreaterThanOrEqual(45);
+  });
+
+  it('names the tables a failed transaction wrote on its ROLLBACK line', async () => {
+    await expect(
+      log.withRequest('c4d2e1', () => orders.placeAndFail(3, 'C3')),
+    ).rejects.toThrow('stock gone');
+
+    expect(written.map(shape)).toEqual([
+      'info OrderRepository.placeAndFail - run | START',
+      'debug OrderRepository.placeAndFail - query START TRANSACTION | START',
+      'debug OrderRepository.placeAndFail - query START TRANSACTION | DONE Nms',
+      'debug OrderRepository.placeAndFail - query INSERT orders | START',
+      'debug OrderRepository.placeAndFail - query INSERT orders | DONE Nms',
+      'debug OrderRepository.placeAndFail - query INSERT order_lines | START',
+      'debug OrderRepository.placeAndFail - query INSERT order_lines | DONE Nms',
+      'debug OrderRepository.placeAndFail - query SELECT orders | START',
+      'debug OrderRepository.placeAndFail - query SELECT orders | DONE Nms',
+      'debug OrderRepository.placeAndFail - query ROLLBACK orders, order_lines | START',
+      'warn OrderRepository.placeAndFail - query ROLLBACK orders, order_lines | DONE Nms',
+      'error OrderRepository.placeAndFail - run | FAILED Nms Error: stock gone',
+    ]);
+    expect(written[10]?.fields.tables).toEqual(['orders', 'order_lines']);
+  });
+
+  it('leaves a statement that failed off the ROLLBACK line', async () => {
+    await expect(orders.placeWithBadLine(5, 'E5')).rejects.toThrow(
+      /invalid input syntax/,
+    );
+
+    expect(transactionEnds(written)).toEqual([
+      'warn OrderRepository.placeWithBadLine - query ROLLBACK orders | DONE Nms',
+    ]);
+  });
+
+  it('names on ROLLBACK TO SAVEPOINT only the tables written since the savepoint', async () => {
+    await dataSource.transaction(async (manager) => {
+      await manager.query('INSERT INTO orders (id, sku) VALUES ($1, $2)', [
+        6,
+        'F6',
+      ]);
+      await manager
+        .transaction(async (inner) => {
+          await inner.query(
+            'INSERT INTO order_lines (order_id, sku) VALUES ($1, $2)',
+            [6, 'F6'],
+          );
+          throw new Error('line rejected');
+        })
+        .catch(() => undefined);
+    });
+
+    expect(transactionEnds(written)).toEqual([
+      'warn query ROLLBACK order_lines | DONE Nms',
+      'debug query COMMIT | DONE Nms',
+    ]);
+  });
+
+  it('keeps the tables of two transactions that run at once apart', async () => {
+    let openGate: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
+    const failing = dataSource.transaction(async (manager) => {
+      await manager.query('INSERT INTO orders (id, sku) VALUES ($1, $2)', [
+        7,
+        'G7',
+      ]);
+      await gate;
+      throw new Error('payment declined');
+    });
+    const passing = dataSource.transaction(async (manager) => {
+      await manager.query(
+        'INSERT INTO order_lines (order_id, sku) VALUES ($1, $2)',
+        [7, 'G7'],
+      );
+      openGate();
+    });
+    await Promise.allSettled([failing, passing]);
+
+    expect(transactionEnds(written).sort()).toEqual([
+      'debug query COMMIT | DONE Nms',
+      'warn query ROLLBACK orders | DONE Nms',
+    ]);
   });
 
   it('matches each end line when another subscriber delays a statement', async () => {

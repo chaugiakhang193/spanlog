@@ -1,14 +1,26 @@
 import json
 import threading
+from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, insert, select, text
+from sqlalchemy import (
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    event,
+    insert,
+    select,
+    text,
+)
 from sqlalchemy.exc import IntegrityError, OperationalError, StatementError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from sqlalchemy.pool import StaticPool
 
 from spanlog import Spanlog, json_sink
-from spanlog.sqlalchemy import log_queries
+from spanlog.sqlalchemy import _autocommits, log_queries
 
 meta = MetaData()
 items = Table(
@@ -201,22 +213,86 @@ def test_error_message_still_replaces_the_text(engine):
     assert failed[0]["err"]["message"] == "hidden"
 
 
-def test_rollback_written_as_a_statement_is_warn(engine):
+def test_rollback_written_as_a_statement_names_the_tables(engine):
     recording = Recording()
     log_queries(engine, recording.log)
     with engine.connect() as conn:
         conn.exec_driver_sql("BEGIN")
+        conn.execute(insert(items).values(email="a"))
         conn.exec_driver_sql("ROLLBACK")
     done = [q for q in recording.queries() if q["phase"] == "DONE"]
-    assert [(q["op"], q["level"]) for q in done] == [("BEGIN", "debug"), ("ROLLBACK", "warn")]
+    assert [(q["op"], q["level"], q["tables"]) for q in done] == [
+        ("BEGIN", "debug", []),
+        ("INSERT", "debug", ["items"]),
+        ("ROLLBACK", "warn", ["items"]),
+    ]
 
 
-def test_transaction_events_write_no_line(engine):
+def test_a_transaction_without_a_write_writes_no_rollback_line(engine):
     recording = Recording()
     log_queries(engine, recording.log)
     with engine.begin() as conn:
         conn.execute(text("SELECT 1"))
-    assert [q["op"] for q in recording.queries()] == ["SELECT", "SELECT"]
+    with engine.connect() as conn:
+        conn.execute(select(items))
+    assert [q["op"] for q in recording.queries()] == ["SELECT"] * 4
+
+
+def test_a_rolled_back_transaction_names_the_tables_it_wrote(engine):
+    recording = Recording()
+    log_queries(engine, recording.log)
+    with pytest.raises(RuntimeError), engine.begin() as conn:
+        conn.execute(insert(items).values(email="a"))
+        conn.execute(select(items))
+        raise RuntimeError("payment declined")
+    rollback = [q for q in recording.queries() if q["op"] == "ROLLBACK"]
+    assert [(q["phase"], q["level"], q["target"], q["tables"]) for q in rollback] == [
+        ("START", "debug", "ROLLBACK items", ["items"]),
+        ("DONE", "warn", "ROLLBACK items", ["items"]),
+    ]
+    assert rollback[1]["ms"] >= 0
+
+
+def test_session_rollback_after_a_flush_names_the_table(engine):
+    recording = Recording()
+    log_queries(engine, recording.log)
+    with Session(engine) as session:
+        session.execute(insert(items).values(email="a"))
+        session.rollback()
+    rollback = [(q["phase"], q["tables"]) for q in recording.queries() if q["op"] == "ROLLBACK"]
+    assert rollback == [("START", ["items"]), ("DONE", ["items"])]
+
+
+def test_a_committed_transaction_writes_no_rollback_line(engine):
+    recording = Recording()
+    log_queries(engine, recording.log)
+    with engine.begin() as conn:
+        conn.execute(insert(items).values(email="a"))
+    with engine.connect() as conn:
+        conn.execute(select(items))
+    assert "ROLLBACK" not in [q["op"] for q in recording.queries()]
+
+
+def test_autocommit_writes_no_rollback_line(engine):
+    recording = Recording()
+    log_queries(engine, recording.log)
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(insert(items).values(email="kept"))
+    with engine.connect() as conn:
+        assert conn.execute(select(items.c.email)).scalars().all() == ["kept"]
+    assert "ROLLBACK" not in [q["op"] for q in recording.queries()]
+
+
+def test_detach_gives_the_dialect_its_own_do_rollback(engine):
+    recording = Recording()
+    detach = log_queries(engine, recording.log)
+    assert "do_rollback" in vars(engine.dialect)
+    detach()
+    assert "do_rollback" not in vars(engine.dialect)
+    with pytest.raises(RuntimeError), engine.begin() as conn:
+        conn.execute(insert(items).values(email="a"))
+        raise RuntimeError("after detach")
+    assert recording.written == []
 
 
 def test_a_failing_connection_writes_no_line(tmp_path):
@@ -285,3 +361,66 @@ def test_a_broken_sink_does_not_fail_the_statement(engine):
 def test_refuses_what_is_not_an_engine():
     with pytest.raises(TypeError, match="Engine or an AsyncEngine"):
         log_queries(object(), Recording().log)
+
+
+# The insert stays in the open transaction of the driver after the stopped rollback, and the
+# commit keeps it. Connection.begin and commit run no statement in between.
+@pytest.mark.parametrize("commit_with", ["Connection.begin and commit", "a COMMIT statement"])
+def test_a_rollback_stopped_by_another_listener_leaves_nothing_armed(engine, commit_with):
+    recording = Recording()
+    log_queries(engine, recording.log)
+
+    def stop(conn):
+        raise RuntimeError("stopped")
+
+    event.listen(engine, "rollback", stop)
+    with engine.connect() as conn:
+        conn.execute(insert(items).values(email="a"))
+        with pytest.raises(RuntimeError):
+            conn.rollback()
+        event.remove(engine, "rollback", stop)
+        if commit_with == "Connection.begin and commit":
+            conn.begin()
+            conn.commit()
+        else:
+            conn.exec_driver_sql("COMMIT")
+    with engine.connect() as conn:
+        assert conn.execute(select(items.c.email)).scalars().all() == ["a"]
+    assert "ROLLBACK" not in [q["op"] for q in recording.queries()]
+
+
+# A statement that does not end the transaction leaves the insert in it, and the rollback of
+# the close undoes the insert.
+def test_a_rollback_after_a_stopped_one_and_a_read_names_the_tables_it_undoes(engine):
+    recording = Recording()
+    log_queries(engine, recording.log)
+
+    def stop(conn):
+        raise RuntimeError("stopped")
+
+    event.listen(engine, "rollback", stop)
+    with engine.connect() as conn:
+        conn.execute(insert(items).values(email="a"))
+        with pytest.raises(RuntimeError):
+            conn.rollback()
+        event.remove(engine, "rollback", stop)
+        conn.execute(text("SELECT 1"))
+    with engine.connect() as conn:
+        assert conn.execute(select(items.c.email)).scalars().all() == []
+    rollbacks = [q for q in recording.queries() if q["op"] == "ROLLBACK"]
+    assert [q["phase"] for q in rollbacks] == ["START", "DONE"]
+    assert all(q["tables"] == ["items"] for q in rollbacks)
+
+
+@pytest.mark.parametrize("order", ["first attached first", "last attached first"])
+def test_detach_in_any_order_gives_the_dialect_its_own_do_rollback(engine, order):
+    first = log_queries(engine, Recording().log)
+    second = log_queries(engine, Recording().log)
+    detaches = [first, second] if order == "first attached first" else [second, first]
+    for detach in detaches:
+        detach()
+    assert "do_rollback" not in vars(engine.dialect)
+
+
+def test_a_dialect_that_cannot_detect_autocommit_is_taken_as_not_in_autocommit():
+    assert _autocommits(SimpleNamespace(), object()) is False

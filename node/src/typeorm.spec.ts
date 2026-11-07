@@ -524,6 +524,7 @@ describe('logQueries pairing', () => {
     const { written, subscribers } = setup();
 
     void subscribers[0]?.afterQuery?.({
+      queryRunner: {},
       query: SQL,
       success: true,
     } as unknown as AfterQueryEvent);

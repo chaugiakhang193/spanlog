@@ -74,7 +74,9 @@ Outside HTTP, `log.withRequest(jobId, fn)` gives every line inside `fn` the same
 `logQueries(dataSource, log)` from `spanlog/typeorm` goes after `await dataSource.initialize()`. It returns a function
 that removes the subscriber. SQL text and parameters are never written. The parser and its known limits are described
 in [Query lines](log-format.md#query-lines). Statements of `QueryRunner.stream()` write no lines, because TypeORM fires
-no query events for them.
+no query events for them. A `ROLLBACK` names the tables written in its transaction, as described in
+[Query lines](log-format.md#query-lines). Each `QueryRunner` is followed on its own, so two transactions that run at once
+keep their tables apart.
 
 ## Sinks
 

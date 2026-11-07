@@ -91,6 +91,14 @@ class TransactionTables:
         _add_new(self._levels[-1], released)
 
 
+def ends_transaction(sql: str) -> bool:
+    """Tell COMMIT, END, ABORT and the ROLLBACK of a whole transaction apart from the rest."""
+    op = summarize_sql(sql).op
+    if op == "ROLLBACK":
+        return not rolls_back_to_savepoint(sql)
+    return op in _END_OPS
+
+
 def _add_new(into: list[str], tables: list[str]) -> None:
     for table in tables:
         if table not in into:

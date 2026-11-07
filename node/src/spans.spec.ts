@@ -199,6 +199,30 @@ describe('startQuery', () => {
     expect(written.map(shape)).toEqual(['warn query ROLLBACK | DONE Nms']);
   });
 
+  it('names the tables an adapter gives a ROLLBACK', () => {
+    const { spanlog, written } = setup();
+    spanlog.startQuery('ROLLBACK', ['orders', 'warehouse.inventory']).end();
+
+    expect(written.map(shape)).toEqual([
+      'debug query ROLLBACK orders, warehouse.inventory | START',
+      'warn query ROLLBACK orders, warehouse.inventory | DONE Nms',
+    ]);
+    expect(written[1]?.fields.tables).toEqual([
+      'orders',
+      'warehouse.inventory',
+    ]);
+  });
+
+  it('keeps the tables of its text for a statement other than ROLLBACK', () => {
+    const { spanlog, written } = setup();
+    spanlog.startQuery('COMMIT', ['orders']).end();
+
+    expect(written.map(shape)).toEqual([
+      'debug query COMMIT | START',
+      'debug query COMMIT | DONE Nms',
+    ]);
+  });
+
   it('fails at warn without a stack and leaves the error to its frame', async () => {
     const { spanlog, written } = setup();
     const failure = new Error('duplicate key value');

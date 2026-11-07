@@ -16,7 +16,7 @@ import { withoutOwnFrames } from './frames.js';
 import { redact } from './redact.js';
 import { levelFor, render } from './render.js';
 import { prettySink, type SpanSink } from './sinks.js';
-import { queryTarget, summarizeSql } from './sql.js';
+import { queryTarget, type SqlSummary, summarizeSql } from './sql.js';
 import type { Action, Level, Phase, SpanEvent } from './types.js';
 
 export interface SpanlogOptions {
@@ -106,9 +106,11 @@ export interface Spanlog {
   /**
    * startQuery writes the START line of a SQL statement in the frame running
    * now. The statement is read for its op and tables. Its text is never
-   * written. Database adapters call it.
+   * written. On a ROLLBACK, rolledBackTables replaces the tables read from the
+   * statement, and the line names the tables that the rollback undoes. Other
+   * statements ignore it. Database adapters call it.
    */
-  startQuery(sql: string): QuerySpan;
+  startQuery(sql: string, rolledBackTables?: readonly string[]): QuerySpan;
 }
 
 export const DEFAULT_SLOW_MS = 500;
@@ -377,9 +379,12 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     };
   }
 
-  function startQuery(sql: string): QuerySpan {
+  function startQuery(
+    sql: string,
+    rolledBackTables?: readonly string[],
+  ): QuerySpan {
     const context = currentContext();
-    const summary = summarizeSql(sql);
+    const summary = withRolledBackTables(summarizeSql(sql), rolledBackTables);
     const startLine: UnstampedEvent = {
       scope: context?.frame?.scope,
       method: context?.frame?.method,
@@ -411,6 +416,18 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     startRequest,
     startQuery,
   };
+}
+
+// Only a ROLLBACK takes the tables of an adapter. Any other statement keeps the
+// tables of its own text.
+function withRolledBackTables(
+  summary: SqlSummary,
+  rolledBackTables: readonly string[] | undefined,
+): SqlSummary {
+  if (summary.op !== 'ROLLBACK' || rolledBackTables === undefined) {
+    return summary;
+  }
+  return { op: summary.op, tables: [...rolledBackTables] };
 }
 
 // ownerOf decides whose line a wrapped call writes. Inside another wrapped
