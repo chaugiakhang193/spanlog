@@ -45,7 +45,7 @@ curl -X POST localhost:3022/orders -H 'content-type: application/json' -d '{"sku
 
 ## go-http
 
-Needs Go 1.26. It keeps the stock in memory and has no query lines, because the Go module has none.
+Needs Go 1.26. It keeps the stock in memory and has no database.
 
 ```bash
 cd examples/go-http

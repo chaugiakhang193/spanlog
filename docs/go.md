@@ -93,6 +93,18 @@ is kept. Otherwise a new id is generated. `spanlog.RequestID(ctx)` returns it.
 
 Outside HTTP, `spanlog.WithRequest(ctx, jobID)` gives every line under that context the same id.
 
+## Query lines
+
+`StartQuery` writes the START line of a SQL statement in the frame of `ctx` and returns a `QuerySpan`. `End` writes
+`DONE` or `SLOW`, and `Fail(err)` writes `FAILED` with the text of `err` and no stack. The frame that receives the error
+writes it with its stack. The statement is read for its operation and tables, and its text is not written.
+
+    span := logger.StartQuery(ctx, query)
+    _, err := conn.Exec(ctx, query, args...)
+    span.Fail(err)
+
+`WithRolledBackTables` gives a `ROLLBACK` the tables that it undoes. The rules are in [Query lines](log-format.md#query-lines).
+
 ## Sinks
 
 - `PrettySink(w)` writes the readable lines.
@@ -108,8 +120,7 @@ of an error is written as it is, and `ErrorMessage` replaces it.
 
 ## Known limits
 
-The Go module writes no query lines. Limits of errors, panics and the middleware are listed in
-[Errors in Go](log-format.md#errors-in-go).
+Limits of errors, panics and the middleware are listed in [Errors in Go](log-format.md#errors-in-go).
 
 ## Tested versions
 
