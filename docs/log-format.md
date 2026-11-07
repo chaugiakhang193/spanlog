@@ -192,8 +192,8 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
 
 ## Query lines
 
-The Go module has no query lines. The `sql` list of [`spec/cases.json`](../spec/cases.json) is tested in Node.js and
-Python.
+The Go module has no query lines. The `sql` and `transactions` lists of [`spec/cases.json`](../spec/cases.json) are
+tested in Node.js and Python.
 
 - `op` is the first keyword of the statement in capitals. `START TRANSACTION` keeps both words. For a statement that
   starts with `WITH`, `op` is the keyword after the common table expressions. Parentheses before that keyword are
@@ -264,10 +264,12 @@ The `call ... | FAILED` line of the second order, written by the JSON writer:
 
 ## Sample cases
 
-[`spec/cases.json`](../spec/cases.json) holds two lists.
+[`spec/cases.json`](../spec/cases.json) holds three lists.
 
 - `render`: an event and the expected `level`, `msg`, `fields` and readable `lines`. Each event carries `time`
   (ISO 8601), the raw duration in `durationMs`, and two inputs that are not output fields: `sameScope` for calls
   within one scope, and `firstReport` for the first report of an error in a request. `options.utcOffsetMinutes` sets
   the offset of the readable line.
 - `sql`: a statement and the expected `op` and `tables`.
+- `transactions`: statements run in order on one connection, and the expected `tables` of each `ROLLBACK` among them.
+  The rules are in [Query lines](#query-lines).

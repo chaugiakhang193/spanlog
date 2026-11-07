@@ -1376,5 +1376,279 @@
       "op": "SELECT",
       "tables": ["FROM", "orders"]
     }
+  ],
+  "transactions": [
+    {
+      "name": "rollback lists the tables written in the transaction",
+      "statements": [
+        "START TRANSACTION",
+        "INSERT INTO \"orders\"(\"id\", \"sku\") VALUES ($1, $2)",
+        "UPDATE \"warehouse\".\"inventory\" SET \"available\" = $1 WHERE \"sku\" = $2",
+        "INSERT INTO \"orders\"(\"id\", \"sku\") VALUES ($1, $2)",
+        "SELECT \"id\" FROM \"payments\" WHERE \"order_id\" = $1",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["orders", "warehouse.inventory"]]
+    },
+    {
+      "name": "delete and merge are writes",
+      "statements": [
+        "BEGIN",
+        "DELETE FROM carts WHERE id = $1",
+        "MERGE INTO stock s USING incoming i ON s.sku = i.sku WHEN MATCHED THEN UPDATE SET qty = i.qty",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["carts", "stock"]]
+    },
+    {
+      "name": "a write lists the tables it reads",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO archive SELECT * FROM orders WHERE created_at < $1",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["archive", "orders"]]
+    },
+    {
+      "name": "statements outside a transaction are not kept",
+      "statements": [
+        "INSERT INTO audit (msg) VALUES ($1)",
+        "BEGIN",
+        "INSERT INTO orders (sku) VALUES ($1)",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["orders"]]
+    },
+    {
+      "name": "commit forgets the tables",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO orders (sku) VALUES ($1)",
+        "COMMIT",
+        "ROLLBACK",
+        "BEGIN",
+        "UPDATE inventory SET available = 0",
+        "ROLLBACK"
+      ],
+      "rollbacks": [[], ["inventory"]]
+    },
+    {
+      "name": "rollback without a write lists nothing",
+      "statements": ["BEGIN", "SELECT 1 FROM orders", "ROLLBACK"],
+      "rollbacks": [[]]
+    },
+    {
+      "name": "rollback outside a transaction lists nothing",
+      "statements": ["ROLLBACK"],
+      "rollbacks": [[]]
+    },
+    {
+      "name": "rollback to a savepoint lists the tables written since it",
+      "statements": [
+        "START TRANSACTION",
+        "INSERT INTO orders (sku) VALUES ($1)",
+        "SAVEPOINT typeorm_1",
+        "INSERT INTO order_lines (order_id) VALUES ($1)",
+        "ROLLBACK TO SAVEPOINT typeorm_1",
+        "UPDATE inventory SET available = 0",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["order_lines"], ["orders", "inventory"]]
+    },
+    {
+      "name": "released savepoint joins the one before",
+      "statements": [
+        "BEGIN",
+        "SAVEPOINT sa_savepoint_1",
+        "INSERT INTO orders (sku) VALUES ($1)",
+        "RELEASE SAVEPOINT sa_savepoint_1",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["orders"]]
+    },
+    {
+      "name": "nested savepoints roll back innermost first",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "SAVEPOINT s1",
+        "INSERT INTO b (v) VALUES (1)",
+        "SAVEPOINT s2",
+        "INSERT INTO c (v) VALUES (1)",
+        "ROLLBACK TO SAVEPOINT s2",
+        "RELEASE SAVEPOINT s2",
+        "ROLLBACK TO SAVEPOINT s1",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["c"], ["b"], ["a"]]
+    },
+    {
+      "name": "savepoint stays open after a rollback to it",
+      "statements": [
+        "BEGIN",
+        "SAVEPOINT s",
+        "INSERT INTO a (v) VALUES (1)",
+        "ROLLBACK TO s",
+        "INSERT INTO b (v) VALUES (1)",
+        "ROLLBACK TO SAVEPOINT s",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["a"], ["b"], []]
+    },
+    {
+      "name": "rollback keywords fold case and skip comments",
+      "statements": [
+        "begin",
+        "insert into a (v) values (1)",
+        "savepoint s",
+        "insert into b (v) values (1)",
+        "/* undo */ rollback work to savepoint s",
+        "Rollback Transaction"
+      ],
+      "rollbacks": [["b"], ["a"]]
+    },
+    {
+      "name": "start transaction and end",
+      "statements": ["START TRANSACTION", "DELETE FROM a WHERE v = 1", "END", "ROLLBACK"],
+      "rollbacks": [[]]
+    },
+    {
+      "name": "abort ends the transaction without a list",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "ABORT",
+        "INSERT INTO b (v) VALUES (1)",
+        "ROLLBACK"
+      ],
+      "rollbacks": [[]]
+    },
+    {
+      "name": "rollback to a savepoint never seen lists nothing",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "ROLLBACK TO SAVEPOINT s",
+        "ROLLBACK"
+      ],
+      "rollbacks": [[], ["a"]]
+    },
+    {
+      "name": "rollback twice in a row lists the tables once",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "ROLLBACK",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["a"], []]
+    },
+    {
+      "name": "rollback transaction to a savepoint",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "SAVEPOINT s",
+        "INSERT INTO b (v) VALUES (1)",
+        "ROLLBACK TRANSACTION TO SAVEPOINT s",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["b"], ["a"]]
+    },
+    {
+      "name": "savepoint outside a transaction keeps nothing",
+      "statements": [
+        "SAVEPOINT s",
+        "INSERT INTO a (v) VALUES (1)",
+        "ROLLBACK TO SAVEPOINT s",
+        "ROLLBACK"
+      ],
+      "rollbacks": [[], []]
+    },
+    {
+      "name": "release without a savepoint keeps the tables written before it",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "RELEASE SAVEPOINT s",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["a"]]
+    },
+    {
+      "name": "commit and chain opens the next transaction",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "COMMIT AND CHAIN",
+        "INSERT INTO b (v) VALUES (1)",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["b"]]
+    },
+    {
+      "name": "rollback and chain lists the tables and opens the next transaction",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "ROLLBACK AND CHAIN",
+        "INSERT INTO b (v) VALUES (1)",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["a"], ["b"]]
+    },
+    {
+      "name": "end, abort, work and transaction with and chain",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "END AND CHAIN",
+        "INSERT INTO b (v) VALUES (1)",
+        "ABORT AND CHAIN",
+        "INSERT INTO c (v) VALUES (1)",
+        "commit work /* keep going */ and chain",
+        "INSERT INTO d (v) VALUES (1)",
+        "ROLLBACK TRANSACTION AND CHAIN",
+        "INSERT INTO e (v) VALUES (1)",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["d"], ["e"]]
+    },
+    {
+      "name": "and no chain ends the transaction",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "COMMIT AND NO CHAIN",
+        "INSERT INTO b (v) VALUES (1)",
+        "ROLLBACK",
+        "BEGIN",
+        "INSERT INTO c (v) VALUES (1)",
+        "ROLLBACK AND NO CHAIN",
+        "INSERT INTO d (v) VALUES (1)",
+        "ROLLBACK"
+      ],
+      "rollbacks": [[], ["c"], []]
+    },
+    {
+      "name": "known limit: a write inside a common table expression of a select is not kept",
+      "statements": [
+        "BEGIN",
+        "WITH gone AS (DELETE FROM carts RETURNING id) SELECT count(*) FROM gone",
+        "ROLLBACK"
+      ],
+      "rollbacks": [[]]
+    },
+    {
+      "name": "known limit: begin inside a transaction starts a new list",
+      "statements": [
+        "BEGIN",
+        "INSERT INTO a (v) VALUES (1)",
+        "BEGIN",
+        "INSERT INTO b (v) VALUES (1)",
+        "ROLLBACK"
+      ],
+      "rollbacks": [["b"]]
+    }
   ]
 }

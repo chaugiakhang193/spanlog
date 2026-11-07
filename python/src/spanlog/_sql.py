@@ -88,6 +88,41 @@ def query_target(summary: SqlSummary) -> str:
     return f"{summary.op} {', '.join(summary.tables)}"
 
 
+def rolls_back_to_savepoint(sql: str) -> bool:
+    """Tell ROLLBACK TO SAVEPOINT apart from the ROLLBACK of a whole transaction.
+
+    summarize_sql gives both the op ROLLBACK. It never raises.
+    """
+    tokens = _tokenize(sql)
+    if not _is_keyword(_token_at(tokens, 0), "ROLLBACK"):
+        return False
+    return _is_keyword(_token_at(tokens, _after_work_or_transaction(tokens)), "TO")
+
+
+_TRANSACTION_ENDS = ("COMMIT", "END", "ABORT", "ROLLBACK")
+
+
+def chains_transaction(sql: str) -> bool:
+    """Tell COMMIT, END, ABORT or ROLLBACK with AND CHAIN apart from the same statement without it.
+
+    Postgres starts the next transaction once such a statement succeeds. It never raises.
+    """
+    tokens = _tokenize(sql)
+    first = _token_at(tokens, 0)
+    if not any(_is_keyword(first, word) for word in _TRANSACTION_ENDS):
+        return False
+    after_word = _after_work_or_transaction(tokens)
+    has_and = _is_keyword(_token_at(tokens, after_word), "AND")
+    return has_and and _is_keyword(_token_at(tokens, after_word + 1), "CHAIN")
+
+
+# The position after the optional WORK or TRANSACTION that follows the first keyword of a
+# transaction statement.
+def _after_work_or_transaction(tokens: list[_Token]) -> int:
+    second = _token_at(tokens, 1)
+    return 2 if _is_keyword(second, "WORK") or _is_keyword(second, "TRANSACTION") else 1
+
+
 # tokens[-1] in Python is the last token. A position before the first token holds
 # nothing, as past the last one.
 def _token_at(tokens: list[_Token], index: int) -> _Token | None:

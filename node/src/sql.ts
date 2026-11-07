@@ -97,6 +97,46 @@ export function queryTarget(summary: SqlSummary): string {
   return `${summary.op} ${summary.tables.join(', ')}`;
 }
 
+/**
+ * rollsBackToSavepoint tells ROLLBACK TO SAVEPOINT apart from the ROLLBACK of
+ * a whole transaction. summarizeSql gives both the op ROLLBACK. It never
+ * throws.
+ */
+export function rollsBackToSavepoint(sql: string): boolean {
+  const tokens = tokenize(sql);
+  if (!isKeyword(tokens[0], 'ROLLBACK')) {
+    return false;
+  }
+  return isKeyword(tokens[afterWorkOrTransaction(tokens)], 'TO');
+}
+
+const TRANSACTION_ENDS = ['COMMIT', 'END', 'ABORT', 'ROLLBACK'];
+
+/**
+ * chainsTransaction tells COMMIT, END, ABORT or ROLLBACK with AND CHAIN apart
+ * from the same statement without it. Postgres starts the next transaction
+ * once such a statement succeeds. It never throws.
+ */
+export function chainsTransaction(sql: string): boolean {
+  const tokens = tokenize(sql);
+  if (!TRANSACTION_ENDS.some((word) => isKeyword(tokens[0], word))) {
+    return false;
+  }
+  const afterWord = afterWorkOrTransaction(tokens);
+  return (
+    isKeyword(tokens[afterWord], 'AND') &&
+    isKeyword(tokens[afterWord + 1], 'CHAIN')
+  );
+}
+
+// afterWorkOrTransaction returns the position after the optional WORK or
+// TRANSACTION that follows the first keyword of a transaction statement.
+function afterWorkOrTransaction(tokens: readonly Token[]): number {
+  return isKeyword(tokens[1], 'WORK') || isKeyword(tokens[1], 'TRANSACTION')
+    ? 2
+    : 1;
+}
+
 // tokenize keeps words, double-quoted identifiers and the punctuation that
 // shapes table names and subqueries. String literals and comments are dropped
 // unread because they can hold application values. Everything else, such as
