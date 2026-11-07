@@ -192,8 +192,8 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
 
 ## Query lines
 
-The `sql` list of [`spec/cases.json`](../spec/cases.json) is tested in Node.js, Go and Python, and the `transactions`
-list in Node.js and Python. The Go module writes query lines through `StartQuery`.
+The `sql` and `transactions` lists of [`spec/cases.json`](../spec/cases.json) are tested in Node.js, Go and Python. The
+Go module writes query lines through `StartQuery`.
 
 - `op` is the first keyword of the statement in capitals. `START TRANSACTION` keeps both words. For a statement that
   starts with `WITH`, `op` is the keyword after the common table expressions. Parentheses before that keyword are
