@@ -95,6 +95,31 @@ Outside HTTP, `spanlog.WithRequest(ctx, jobID)` gives every line under that cont
 
 ## Query lines
 
+`Connector` wraps the `driver.Connector` of any `database/sql` driver. With pgx:
+
+    connector := stdlib.GetConnector(*config) // config from pgx.ParseConfig
+    db := sql.OpenDB(logger.Connector(connector))
+
+A driver without its own connector gives one through `driver.DriverContext`:
+`sql.Open` once, then `db.Driver().(driver.DriverContext).OpenConnector(dsn)`. For a driver with neither, a
+`driver.Connector` whose `Connect` returns `Open(dsn)` of the driver does the same.
+
+- A statement writes its pair around the call to the driver. A query ends when its rows are closed, which
+  `database/sql` does after the last row, on an error and on `Rows.Close`. Rows left open keep the query without an end
+  line. The duration of a query includes the time the application spends between rows.
+- A query fails when reading a row fails. Postgres sends an error such as a division by zero with the row that causes
+  it, after the rows before it.
+- `BeginTx` writes a `BEGIN` pair, `Commit` a `COMMIT` pair and `Rollback` a `ROLLBACK` pair that names the tables
+  written in the transaction. The three belong to the frame of the context given to `BeginTx`, because `driver.Tx` has
+  no context. A `Rollback` after `Commit` writes nothing, because `database/sql` returns `sql.ErrTxDone` without calling
+  the driver.
+- When the context of a transaction ends, `database/sql` rolls it back on a goroutine of its own. pgx closes a
+  connection whose statement is cancelled. That `ROLLBACK` ends with `FAILED conn closed`, and Postgres undoes the
+  transaction as the session ends.
+- A statement that the driver answers with `driver.ErrSkip` runs again as a prepared statement, and writes one pair.
+  Goroutines that share a `Tx` or a `Conn` can run statements between the two calls, and each statement still keeps
+  its own pair.
+
 `StartQuery` writes the START line of a SQL statement in the frame of `ctx` and returns a `QuerySpan`. `End` writes
 `DONE` or `SLOW`, and `Fail(err)` writes `FAILED` with the text of `err` and no stack. The frame that receives the error
 writes it with its stack. The statement is read for its operation and tables, and its text is not written.
@@ -121,6 +146,19 @@ of an error is written as it is, and `ErrorMessage` replaces it.
 ## Known limits
 
 Limits of errors, panics and the middleware are listed in [Errors in Go](log-format.md#errors-in-go).
+
+`sql.Conn.Raw` hands over the connection of `Connector`, not the one of the driver. `db.Driver()` returns the driver of
+the wrapped connector, and a connection opened from it writes no query lines.
+
+- A statement that the driver answers with `driver.ErrSkip` through `sql.Conn.Raw` is never prepared by `database/sql`.
+  It ends with `FAILED driver: skip fast-path; continue as if unimplemented` when the connection closes.
+- A query whose context ends while its rows are read ends with what the driver returns when the rows close: `FAILED`
+  with that error, or `DONE` when it returns none. `database/sql` closes the rows without passing the error of the
+  context to the driver, and keeps that error for `rows.Err()`.
+- On a `DB`, when the driver answers `driver.ErrBadConn`, `database/sql` runs the statement again. The first attempt
+  ends with `FAILED driver: bad connection` and the next one writes its own pair.
+- Interfaces that `database/sql/driver` gains after Go 1.26 are not passed through by the connections, statements and
+  rows of `Connector`.
 
 ## Tested versions
 

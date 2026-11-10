@@ -91,7 +91,7 @@ app.add_middleware(LogRequests, log=log)
 |---|---|---|---|
 | Incoming requests | Express 5 | `net/http` | ASGI (FastAPI, Starlette), WSGI (Flask) |
 | Calls | `traced` wraps a whole object, `call` wraps one piece of work | `Start` in each method, `Call` wraps one piece of work | `traced` wraps a whole object, `call` and `acall` wrap one piece of work |
-| Database queries | TypeORM 1.1, with the operation and table names | `StartQuery`, with the operation and table names | SQLAlchemy 2, with the operation and table names |
+| Database queries | TypeORM 1.1, with the operation and table names | `database/sql`, any driver, with the operation and table names | SQLAlchemy 2, with the operation and table names |
 | Destinations | Readable text, JSON, pino | Readable text, JSON, slog | Readable text, JSON, `logging` |
 
 All implementations follow one [specification](docs/log-format.md) and are tested against the same

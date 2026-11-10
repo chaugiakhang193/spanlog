@@ -36,7 +36,8 @@ type QuerySpan struct {
 
 // StartQuery writes the START line of a SQL statement in the frame running in
 // ctx. The statement is read for its op and tables. Its text is never written.
-// Database adapters call it.
+// Database adapters call it. Connector calls it for every statement of
+// database/sql.
 func (l *Logger) StartQuery(ctx context.Context, sql string, options ...QueryOption) *QuerySpan {
 	config := queryConfig{}
 	for _, option := range options {
