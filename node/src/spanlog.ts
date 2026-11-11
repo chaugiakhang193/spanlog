@@ -151,146 +151,44 @@ export function getRequestId(): string | undefined {
 }
 
 export function createSpanlog(options: SpanlogOptions): Spanlog {
-  // Each option is read once here. A getter on options never runs while a
-  // call is being logged.
-  const service = options.service;
-  const sink = options.sink ?? prettySink();
-  const minRank = LEVEL_RANK[options.level ?? 'info'];
-  const slowMs = options.slowMs ?? DEFAULT_SLOW_MS;
-  const fixedOffsetMinutes = options.utcOffsetMinutes;
-  const redactKeys = options.redactKeys ?? [];
-  const errorMessage = options.errorMessage;
+  const logger = new Logger(options);
+  // createSpanlog binds each function to logger. A caller can destructure them,
+  // as in const { traced } = spanlog.
+  return {
+    traced: logger.traced.bind(logger),
+    call: logger.spanlogCall.bind(logger),
+    withRequest: logger.spanlogWithRequest.bind(logger),
+    startRequest: logger.startRequest.bind(logger),
+    startQuery: logger.startQuery.bind(logger),
+  };
+}
 
-  function emit(unstamped: UnstampedEvent): void {
-    const event: SpanEvent = { ...unstamped, time: new Date(), service };
-    if (LEVEL_RANK[levelFor(event)] < minRank) {
-      return;
-    }
-    const utcOffsetMinutes =
-      fixedOffsetMinutes ?? -event.time.getTimezoneOffset();
-    try {
-      sink.write(
-        render(event, { utcOffsetMinutes, stackFilter: withoutOwnFrames }),
-      );
-    } catch (failure) {
-      // A broken sink must never fail the call it describes.
-      process.emitWarning(`spanlog sink failed: ${describeThrown(failure)}`, {
-        code: 'SPANLOG_SINK',
-      });
-    }
+/**
+ * Logger holds the options of one Spanlog and writes its lines. createSpanlog
+ * hands out its public methods.
+ */
+class Logger {
+  private readonly service: string;
+  private readonly sink: SpanSink;
+  private readonly minRank: number;
+  private readonly slowMs: number;
+  private readonly fixedOffsetMinutes: number | undefined;
+  private readonly redactKeys: string[];
+  private readonly errorMessage: ((error: Error) => string) | undefined;
+
+  constructor(options: SpanlogOptions) {
+    // Each option is read once here. A getter on options never runs while a
+    // call is being logged.
+    this.service = options.service;
+    this.sink = options.sink ?? prettySink();
+    this.minRank = LEVEL_RANK[options.level ?? 'info'];
+    this.slowMs = options.slowMs ?? DEFAULT_SLOW_MS;
+    this.fixedOffsetMinutes = options.utcOffsetMinutes;
+    this.redactKeys = options.redactKeys ?? [];
+    this.errorMessage = options.errorMessage;
   }
 
-  function redactRecord(
-    value: Record<string, unknown> | undefined,
-  ): Record<string, unknown> | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-    return redact(value, { keys: redactKeys }) as Record<string, unknown>;
-  }
-
-  async function spanlogTrack<T>(
-    owner: Owner,
-    request: RequestScope,
-    fn: () => T | Promise<T>,
-    callOptions?: CallOptions<T>,
-  ): Promise<T> {
-    const reqId = request.reqId;
-    emit({
-      ...owner,
-      reqId,
-      phase: 'START',
-      params: paramsForEvent(owner, callOptions),
-    });
-    const startedAt = performance.now();
-    let result: T;
-    try {
-      result = await fn();
-    } catch (thrown) {
-      const failure = toFailure(thrown);
-      emit({
-        ...owner,
-        reqId,
-        phase: 'FAILED',
-        durationMs: performance.now() - startedAt,
-        err: errorInfo(failure, redactKeys, errorMessage),
-        firstReport: markReported(request, failure),
-      });
-      throw failure;
-    }
-    const durationMs = performance.now() - startedAt;
-    emit({
-      ...owner,
-      reqId,
-      phase: durationMs > slowMs ? 'SLOW' : 'DONE',
-      durationMs,
-      summary: summaryForEvent(owner, result, callOptions),
-    });
-    return result;
-  }
-
-  function paramsForEvent<T>(
-    owner: Owner,
-    callOptions: CallOptions<T> | undefined,
-  ): Record<string, unknown> | undefined {
-    try {
-      return redactRecord(callOptions?.params);
-    } catch (failure) {
-      // Reading params runs their getters. A getter that throws must not stop
-      // the call from running.
-      process.emitWarning(
-        `spanlog params failed for ${owner.target ?? owner.method}: ${describeThrown(failure)}`,
-        { code: 'SPANLOG_PARAMS' },
-      );
-      return undefined;
-    }
-  }
-
-  function summaryForEvent<T>(
-    owner: Owner,
-    result: T,
-    callOptions: CallOptions<T> | undefined,
-  ): Record<string, unknown> | undefined {
-    if (callOptions === undefined) {
-      return undefined;
-    }
-    try {
-      return redactRecord(summaryOf(result, callOptions));
-    } catch (failure) {
-      // A summarize function that throws must not fail a call that succeeded.
-      process.emitWarning(
-        `spanlog summarize failed for ${owner.target ?? owner.method}: ${describeThrown(failure)}`,
-        { code: 'SPANLOG_SUMMARIZE' },
-      );
-      return undefined;
-    }
-  }
-
-  // Functions that sit on the stack while application code runs carry the
-  // names listed in frames.ts. withoutOwnFrames leaves those frames out of the
-  // readable stack. Each arrow function takes its name from the constant it
-  // is assigned to.
-  function wrapMethod(
-    scope: string,
-    method: string,
-    original: AsyncMethod,
-  ): AsyncMethod {
-    return function spanlogWrapped(
-      this: unknown,
-      ...args: unknown[]
-    ): Promise<unknown> {
-      const parent = currentContext();
-      const request = parent?.request ?? newRequestScope(undefined);
-      const callee: Frame = { scope, method };
-      const context: SpanContext = { request, frame: callee };
-      const owner = ownerOf(parent, callee);
-      const spanlogInvoke = () => original.apply(this, args);
-      const spanlogEnter = () => spanlogTrack(owner, request, spanlogInvoke);
-      return spanlogRunInContext(context, spanlogEnter);
-    };
-  }
-
-  function traced<T extends object>(target: T, scope: string): T {
+  traced<T extends object>(target: T, scope: string): T {
     if (tracedTargets.has(target)) {
       return target;
     }
@@ -298,7 +196,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     for (const name of asyncMethodNames(target)) {
       const original = methods[name] as AsyncMethod;
       Object.defineProperty(target, name, {
-        value: wrapMethod(scope, name, original),
+        value: this.wrapMethod(scope, name, original),
         writable: true,
         configurable: true,
         enumerable: false,
@@ -308,7 +206,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     return target;
   }
 
-  function spanlogCall<T>(
+  spanlogCall<T>(
     target: string,
     fn: () => T | Promise<T>,
     callOptions: CallOptions<T> = {},
@@ -325,53 +223,27 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     };
     // fn runs inside the request. Wrapped methods called from fn share the
     // record of reported errors with this call.
-    const spanlogEnter = () => spanlogTrack(owner, request, fn, callOptions);
+    const spanlogEnter = () =>
+      this.spanlogTrack(owner, request, fn, callOptions);
     return spanlogRunInContext({ request, frame }, spanlogEnter);
   }
 
-  function spanlogWithRequest<T>(reqId: string | undefined, fn: () => T): T {
+  spanlogWithRequest<T>(reqId: string | undefined, fn: () => T): T {
     return spanlogRunInContext(
       { request: newRequestScope(reqId), frame: undefined },
       fn,
     );
   }
 
-  // endOnce returns the writer of the end line for a span opened with
-  // startLine. Only the first call writes. An adapter can end the same span
-  // from more than one event.
-  function endOnce(
-    startLine: UnstampedEvent,
-  ): (end: Partial<UnstampedEvent>) => void {
-    const startedAt = performance.now();
-    let ended = false;
-    return (end) => {
-      if (ended) {
-        return;
-      }
-      ended = true;
-      const durationMs = performance.now() - startedAt;
-      emit({
-        ...startLine,
-        phase: phaseAfter(durationMs),
-        ...end,
-        durationMs,
-      });
-    };
-  }
-
-  function phaseAfter(durationMs: number): Phase {
-    return durationMs > slowMs ? 'SLOW' : 'DONE';
-  }
-
-  function startRequest(target: string): RequestSpan {
+  startRequest(target: string): RequestSpan {
     const startLine: UnstampedEvent = {
       action: 'request',
       target,
       reqId: currentContext()?.request.reqId,
       phase: 'START',
     };
-    emit(startLine);
-    const writeEnd = endOnce(startLine);
+    this.emit(startLine);
+    const writeEnd = this.endOnce(startLine);
     return {
       end: (status) =>
         writeEnd(status >= 500 ? { phase: 'FAILED', status } : { status }),
@@ -379,10 +251,7 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
     };
   }
 
-  function startQuery(
-    sql: string,
-    rolledBackTables?: readonly string[],
-  ): QuerySpan {
+  startQuery(sql: string, rolledBackTables?: readonly string[]): QuerySpan {
     const context = currentContext();
     const summary = withRolledBackTables(summarizeSql(sql), rolledBackTables);
     const startLine: UnstampedEvent = {
@@ -395,8 +264,8 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
       op: summary.op,
       tables: summary.tables,
     };
-    emit(startLine);
-    const writeEnd = endOnce(startLine);
+    this.emit(startLine);
+    const writeEnd = this.endOnce(startLine);
     return {
       end: () => writeEnd({}),
       // A failed statement is not marked as reported. The frame that receives
@@ -404,18 +273,173 @@ export function createSpanlog(options: SpanlogOptions): Spanlog {
       fail: (thrown) =>
         writeEnd({
           phase: 'FAILED',
-          err: errorInfo(toFailure(thrown), redactKeys, errorMessage),
+          err: errorInfo(toFailure(thrown), this.redactKeys, this.errorMessage),
         }),
     };
   }
 
-  return {
-    traced,
-    call: spanlogCall,
-    withRequest: spanlogWithRequest,
-    startRequest,
-    startQuery,
-  };
+  // Functions that sit on the stack while application code runs carry the
+  // names listed in frames.ts. withoutOwnFrames leaves those frames out of the
+  // readable stack. Each arrow function takes its name from the constant it
+  // is assigned to.
+  private wrapMethod(
+    scope: string,
+    method: string,
+    original: AsyncMethod,
+  ): AsyncMethod {
+    // Inside spanlogWrapped, this is the traced object.
+    const logger = this;
+    return function spanlogWrapped(
+      this: unknown,
+      ...args: unknown[]
+    ): Promise<unknown> {
+      const parent = currentContext();
+      const request = parent?.request ?? newRequestScope(undefined);
+      const callee: Frame = { scope, method };
+      const context: SpanContext = { request, frame: callee };
+      const owner = ownerOf(parent, callee);
+      const spanlogInvoke = () => original.apply(this, args);
+      const spanlogEnter = () =>
+        logger.spanlogTrack(owner, request, spanlogInvoke);
+      return spanlogRunInContext(context, spanlogEnter);
+    };
+  }
+
+  private async spanlogTrack<T>(
+    owner: Owner,
+    request: RequestScope,
+    fn: () => T | Promise<T>,
+    callOptions?: CallOptions<T>,
+  ): Promise<T> {
+    const reqId = request.reqId;
+    this.emit({
+      ...owner,
+      reqId,
+      phase: 'START',
+      params: this.paramsForEvent(owner, callOptions),
+    });
+    const startedAt = performance.now();
+    let result: T;
+    try {
+      result = await fn();
+    } catch (thrown) {
+      const failure = toFailure(thrown);
+      this.emit({
+        ...owner,
+        reqId,
+        phase: 'FAILED',
+        durationMs: performance.now() - startedAt,
+        err: errorInfo(failure, this.redactKeys, this.errorMessage),
+        firstReport: markReported(request, failure),
+      });
+      throw failure;
+    }
+    const durationMs = performance.now() - startedAt;
+    this.emit({
+      ...owner,
+      reqId,
+      phase: this.phaseAfter(durationMs),
+      durationMs,
+      summary: this.summaryForEvent(owner, result, callOptions),
+    });
+    return result;
+  }
+
+  // endOnce returns the writer of the end line for a span opened with
+  // startLine. Only the first call writes. An adapter can end the same span
+  // from more than one event.
+  private endOnce(
+    startLine: UnstampedEvent,
+  ): (end: Partial<UnstampedEvent>) => void {
+    const startedAt = performance.now();
+    let ended = false;
+    return (end) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      const durationMs = performance.now() - startedAt;
+      this.emit({
+        ...startLine,
+        phase: this.phaseAfter(durationMs),
+        ...end,
+        durationMs,
+      });
+    };
+  }
+
+  private phaseAfter(durationMs: number): Phase {
+    return durationMs > this.slowMs ? 'SLOW' : 'DONE';
+  }
+
+  private paramsForEvent<T>(
+    owner: Owner,
+    callOptions: CallOptions<T> | undefined,
+  ): Record<string, unknown> | undefined {
+    try {
+      return this.redactRecord(callOptions?.params);
+    } catch (failure) {
+      // Reading params runs their getters. A getter that throws must not stop
+      // the call from running.
+      process.emitWarning(
+        `spanlog params failed for ${owner.target ?? owner.method}: ${describeThrown(failure)}`,
+        { code: 'SPANLOG_PARAMS' },
+      );
+      return undefined;
+    }
+  }
+
+  private summaryForEvent<T>(
+    owner: Owner,
+    result: T,
+    callOptions: CallOptions<T> | undefined,
+  ): Record<string, unknown> | undefined {
+    if (callOptions === undefined) {
+      return undefined;
+    }
+    try {
+      return this.redactRecord(summaryOf(result, callOptions));
+    } catch (failure) {
+      // A summarize function that throws must not fail a call that succeeded.
+      process.emitWarning(
+        `spanlog summarize failed for ${owner.target ?? owner.method}: ${describeThrown(failure)}`,
+        { code: 'SPANLOG_SUMMARIZE' },
+      );
+      return undefined;
+    }
+  }
+
+  private redactRecord(
+    value: Record<string, unknown> | undefined,
+  ): Record<string, unknown> | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    return redact(value, { keys: this.redactKeys }) as Record<string, unknown>;
+  }
+
+  private emit(unstamped: UnstampedEvent): void {
+    const event: SpanEvent = {
+      ...unstamped,
+      time: new Date(),
+      service: this.service,
+    };
+    if (LEVEL_RANK[levelFor(event)] < this.minRank) {
+      return;
+    }
+    const utcOffsetMinutes =
+      this.fixedOffsetMinutes ?? -event.time.getTimezoneOffset();
+    try {
+      this.sink.write(
+        render(event, { utcOffsetMinutes, stackFilter: withoutOwnFrames }),
+      );
+    } catch (failure) {
+      // A broken sink must never fail the call it describes.
+      process.emitWarning(`spanlog sink failed: ${describeThrown(failure)}`, {
+        code: 'SPANLOG_SINK',
+      });
+    }
+  }
 }
 
 // Only a ROLLBACK takes the tables of an adapter. Any other statement keeps the
