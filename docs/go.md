@@ -162,4 +162,4 @@ the wrapped connector, and a connection opened from it writes no query lines.
 
 ## Tested versions
 
-Go 1.26.5 on Linux. Older versions have not been run.
+Go 1.26.5 on Linux, with pgx 5.12.0 against Postgres 18.6. Older versions have not been run.
