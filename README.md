@@ -83,6 +83,7 @@ app.add_middleware(LogRequests, log=log)
 - [Go guide](docs/go.md)
 - [Python guide](docs/python.md)
 - [Log format](docs/log-format.md)
+- [Reading the logs](docs/reading-logs.md)
 - [Examples](examples/README.md)
 
 ## What it covers
