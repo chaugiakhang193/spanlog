@@ -15,6 +15,7 @@ import {
   vi,
 } from 'vitest';
 import { createSpanlog, type Spanlog } from './spanlog.js';
+import { shapeWithLevel } from './testing/helpers.js';
 import { logQueries } from './typeorm.js';
 import type { Rendered } from './types.js';
 
@@ -22,8 +23,6 @@ import type { Rendered } from './types.js';
 const DATABASE_URL =
   process.env.SPANLOG_PG_URL ??
   'postgres://spanlog:spanlog@127.0.0.1:5438/spanlog';
-
-const MS = /\d+(\.\d+)?ms/;
 
 interface Order {
   id: number;
@@ -39,10 +38,6 @@ const OrderEntity = new EntitySchema<Order>({
   },
 });
 
-function shape(rendered: Rendered): string {
-  return `${rendered.level} ${rendered.msg.replace(MS, 'Nms')}`;
-}
-
 function transactionEnds(lines: Rendered[]): string[] {
   return lines
     .filter(
@@ -50,7 +45,7 @@ function transactionEnds(lines: Rendered[]): string[] {
         line.fields.phase === 'DONE' &&
         (line.fields.op === 'ROLLBACK' || line.fields.op === 'COMMIT'),
     )
-    .map(shape);
+    .map(shapeWithLevel);
 }
 
 function firstParameter(parameters: unknown): unknown {
@@ -174,7 +169,7 @@ describe('logQueries on Postgres', () => {
   it('writes the statements of save() in the frame that calls it', async () => {
     await log.withRequest('7f3a9c', () => orders.create(1, 'A1'));
 
-    expect(written.map(shape)).toEqual([
+    expect(written.map(shapeWithLevel)).toEqual([
       'info OrderRepository.create - run | START',
       'debug OrderRepository.create - query SELECT orders | START',
       'debug OrderRepository.create - query SELECT orders | DONE Nms',
@@ -197,7 +192,7 @@ describe('logQueries on Postgres', () => {
       log.withRequest('b81e44', () => orders.insertRaw(2, 'B2')),
     ).rejects.toThrow(/duplicate key/);
 
-    expect(written.map(shape)).toEqual([
+    expect(written.map(shapeWithLevel)).toEqual([
       'info OrderRepository.insertRaw - run | START',
       'debug OrderRepository.insertRaw - query INSERT orders | START',
       'warn OrderRepository.insertRaw - query INSERT orders | FAILED Nms error: duplicate key value violates unique constraint "PK_710e2d4957aa5878dfe94e4ac2f"',
@@ -237,7 +232,7 @@ describe('logQueries on Postgres', () => {
       log.withRequest('c4d2e1', () => orders.placeAndFail(3, 'C3')),
     ).rejects.toThrow('stock gone');
 
-    expect(written.map(shape)).toEqual([
+    expect(written.map(shapeWithLevel)).toEqual([
       'info OrderRepository.placeAndFail - run | START',
       'debug OrderRepository.placeAndFail - query START TRANSACTION | START',
       'debug OrderRepository.placeAndFail - query START TRANSACTION | DONE Nms',
@@ -358,7 +353,7 @@ describe('logQueries on Postgres', () => {
       await runner.query('SELECT 1 FROM order_lines');
     });
 
-    expect(written.map(shape)).toEqual([
+    expect(written.map(shapeWithLevel)).toEqual([
       'debug query SELECT orders | START',
       'debug query SELECT order_lines | START',
       'debug query SELECT order_lines | DONE Nms',

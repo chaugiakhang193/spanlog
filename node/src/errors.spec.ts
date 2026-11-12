@@ -1,277 +1,269 @@
-import { describe, expect, it } from 'vitest';
-import { createSpanlog, type SpanlogOptions } from './spanlog.js';
-import type { Rendered } from './types.js';
+import { runInNewContext } from 'node:vm';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Spanlog } from './spanlog.js';
+import { delay, setup, setupAtDebug, shape } from './testing/helpers.js';
+import type { ErrorInfo, Rendered } from './types.js';
 
-const MS = /\d+(\.\d+)?ms/;
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
-function setup(options: Partial<SpanlogOptions> = {}) {
-  const written: Rendered[] = [];
-  const spanlog = createSpanlog({
-    service: 'shop',
-    sink: { write: (rendered) => written.push(rendered) },
-    utcOffsetMinutes: 0,
-    level: 'debug',
-    ...options,
-  });
-  return { spanlog, written };
-}
+describe('errors', () => {
+  function wireChain(spanlog: Spanlog, failure: unknown) {
+    class Inner {
+      async fail(): Promise<void> {
+        throw failure;
+      }
+    }
+    class Middle {
+      inner!: Inner;
+      async step(): Promise<void> {
+        await this.inner.fail();
+      }
+    }
+    class Outer {
+      middle!: Middle;
+      async run(): Promise<void> {
+        await this.middle.step();
+      }
+    }
+    const outer = spanlog.traced(new Outer(), 'Outer');
+    outer.middle = spanlog.traced(new Middle(), 'Middle');
+    outer.middle.inner = spanlog.traced(new Inner(), 'Inner');
+    return outer;
+  }
 
-// shape hides the measured duration, which changes from run to run.
-function shape(rendered: Rendered): string {
-  return `${rendered.level} ${rendered.msg.replace(MS, 'Nms')}`;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-describe('startRequest', () => {
-  it('writes START and DONE with the status and the reqId', () => {
+  it('reports an error with its stack once and rethrows the same object', async () => {
+    const boom = new Error('stock not available');
     const { spanlog, written } = setup();
-    spanlog.withRequest('7f3a9c', () => {
-      spanlog.startRequest('POST /orders').end(201);
-    });
+    const outer = wireChain(spanlog, boom);
 
-    expect(written.map(shape)).toEqual([
-      'info POST /orders | START',
-      'info POST /orders | DONE 201 Nms',
-    ]);
-    expect(written[1]?.fields).toMatchObject({
-      reqId: '7f3a9c',
-      action: 'request',
-      target: 'POST /orders',
-      phase: 'DONE',
-      status: 201,
-    });
-  });
-
-  it('ends with FAILED at warn for a status of 500 or higher', () => {
-    const { spanlog, written } = setup();
-    spanlog.withRequest('b81e44', () => {
-      spanlog.startRequest('POST /orders').end(500);
-    });
-
-    expect(written.map(shape)).toEqual([
-      'info POST /orders | START',
-      'warn POST /orders | FAILED 500 Nms',
-    ]);
-  });
-
-  it('keeps a 4xx status as DONE', () => {
-    const { spanlog, written } = setup();
-    spanlog.startRequest('GET /orders/9').end(404);
-
-    expect(shape(written[1]!)).toBe('info GET /orders/9 | DONE 404 Nms');
-  });
-
-  it('ends with SLOW after slowMs', async () => {
-    const { spanlog, written } = setup({ slowMs: 5 });
-    const span = spanlog.startRequest('GET /report');
-    await delay(15);
-    span.end(200);
-
-    expect(shape(written[1]!)).toBe('warn GET /report | SLOW 200 Nms');
-  });
-
-  it('writes ABORTED without a status', () => {
-    const { spanlog, written } = setup();
-    spanlog.startRequest('GET /stream').abort();
-
-    expect(shape(written[1]!)).toBe('warn GET /stream | ABORTED Nms');
-    expect(written[1]?.fields).not.toHaveProperty('status');
-  });
-
-  it('writes only the first end line', () => {
-    const { spanlog, written } = setup();
-    const span = spanlog.startRequest('GET /orders');
-    span.end(200);
-    span.end(500);
-    span.abort();
-
-    expect(written.map(shape)).toEqual([
-      'info GET /orders | START',
-      'info GET /orders | DONE 200 Nms',
-    ]);
-  });
-
-  it('keeps the reqId of its request when it ends outside the request', () => {
-    const { spanlog, written } = setup();
-    const span = spanlog.withRequest('7f3a9c', () =>
-      spanlog.startRequest('GET /orders'),
+    await expect(spanlog.withRequest('r-5', () => outer.run())).rejects.toBe(
+      boom,
     );
-    span.end(200);
 
-    expect(written[1]?.fields.reqId).toBe('7f3a9c');
+    const failed = written.filter((l) => l.fields.phase === 'FAILED');
+    expect(failed.map((l) => `${l.level} ${shape(l)}`)).toEqual([
+      'error Middle.step - call Inner.fail | FAILED Nms Error: stock not available',
+      'info Outer.run - call Middle.step | FAILED Nms Error: stock not available',
+      'info Outer.run - run | FAILED Nms Error: stock not available',
+    ]);
+    expect(failed[0]?.fields.err).toMatchObject({
+      name: 'Error',
+      message: 'stock not available',
+      stack: boom.stack,
+    });
+    expect(failed[0]?.lines.length).toBeGreaterThan(1);
+    expect(failed[1]?.fields.err).toEqual({
+      name: 'Error',
+      message: 'stock not available',
+    });
+    expect(failed[2]?.lines).toHaveLength(1);
+  });
+
+  it('reports the same error object once in each request', async () => {
+    const shared = new Error('shared');
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, shared);
+
+    await Promise.allSettled([
+      spanlog.withRequest('a', () => outer.run()),
+      spanlog.withRequest('b', () => outer.run()),
+    ]);
+
+    const errors = written.filter((l) => l.level === 'error');
+    expect(errors.map((l) => l.fields.reqId).sort()).toEqual(['a', 'b']);
+  });
+
+  it('wraps a thrown string in an Error and rethrows the wrapper', async () => {
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, 'plain text');
+
+    const outcome = spanlog.withRequest('r-6', () => outer.run());
+
+    await expect(outcome).rejects.toBeInstanceOf(Error);
+    await expect(outcome).rejects.toMatchObject({
+      message: 'plain text',
+      cause: 'plain text',
+    });
+    expect(written.filter((l) => l.level === 'error')).toHaveLength(1);
+  });
+
+  it('describes a thrown plain object by its redacted JSON', async () => {
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, { code: 'E1', token: 't' });
+
+    await expect(outer.run()).rejects.toEqual({ code: 'E1', token: 't' });
+
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
+      name: 'ThrownValue',
+      message: '{"code":"E1","token":"[REDACTED]"}',
+    });
+  });
+
+  it('rethrows a thrown object whose getter throws while it is described', async () => {
+    const thrown = {};
+    Object.defineProperty(thrown, 'detail', {
+      enumerable: true,
+      get() {
+        throw new Error('getter failed');
+      },
+    });
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, thrown);
+
+    await expect(outer.run()).rejects.toBe(thrown);
+
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
+      name: 'UnreadableError',
+      message: '[unreadable thrown value]',
+    });
+  });
+
+  it('describes a thrown function by its name', async () => {
+    function refused(): void {}
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, refused);
+
+    await expect(outer.run()).rejects.toBe(refused);
+
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
+      name: 'ThrownValue',
+      message: '[Function refused]',
+    });
+  });
+
+  it('marks an Error whose message getter throws as unreadable', async () => {
+    const thrown = new Error('x');
+    Object.defineProperty(thrown, 'message', {
+      get() {
+        throw new Error('getter failed');
+      },
+    });
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, thrown);
+
+    await expect(outer.run()).rejects.toBe(thrown);
+
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
+      name: 'UnreadableError',
+      message: '[unreadable thrown value]',
+    });
+  });
+
+  it('describes an Error from another realm by its name, message and stack', async () => {
+    const foreign = runInNewContext('new RangeError("realm failure")') as {
+      stack: string;
+    };
+    const { spanlog, written } = setup();
+    const outer = wireChain(spanlog, foreign);
+
+    await expect(outer.run()).rejects.toBe(foreign);
+
+    expect(written.find((l) => l.level === 'error')?.fields.err).toEqual({
+      name: 'RangeError',
+      message: 'realm failure',
+      stack: foreign.stack,
+    });
+  });
+
+  it('keeps counting reports when the level hides the outer lines', async () => {
+    const { spanlog, written } = setup({ level: 'error' });
+    const outer = wireChain(spanlog, new Error('x'));
+
+    await expect(spanlog.withRequest('r-7', () => outer.run())).rejects.toThrow(
+      'x',
+    );
+
+    expect(written.map(shape)).toEqual([
+      'Middle.step - call Inner.fail | FAILED Nms Error: x',
+    ]);
   });
 });
 
-interface Database {
-  run(sql: string): Promise<void>;
-}
+describe('readable stack', () => {
+  // OWN_LOCATION matches a frame located in the tracer or context module,
+  // whatever form the runner prints the path in.
+  const OWN_LOCATION = /[\\/]src[\\/](spanlog|context)\.ts:\d+/;
 
-// db lives on its own object. traced wraps async functions held by the
-// repository itself, and the statement must run inside reserve's frame.
-class InventoryRepository {
-  constructor(private readonly db: Database) {}
-
-  async reserve(): Promise<void> {
-    await this.db.run('UPDATE "warehouse"."inventory" SET "available" = 0');
+  function firstReport(written: Rendered[]): Rendered {
+    const rendered = written.find((l) => l.level === 'error');
+    if (rendered === undefined) {
+      throw new Error('no error line written');
+    }
+    return rendered;
   }
-}
 
-describe('startQuery', () => {
-  it('belongs to the frame that runs the statement', async () => {
-    const { spanlog, written } = setup();
-    const repository = spanlog.traced(
-      new InventoryRepository({
-        run: async (sql) => {
-          const span = spanlog.startQuery(sql);
-          await delay(1);
-          span.end();
-        },
-      }),
-      'InventoryRepository',
+  function expectOwnFramesHidden(rendered: Rendered): void {
+    const readable = rendered.lines.slice(1);
+    expect(readable.filter((l) => OWN_LOCATION.test(l))).toEqual([]);
+    expect(readable.some((l) => l.includes('AsyncLocalStorage.run'))).toBe(
+      false,
     );
+    expect(readable.some((l) => l.includes('errors.spec.ts'))).toBe(true);
+    expect((rendered.fields.err as ErrorInfo).stack).toMatch(OWN_LOCATION);
+  }
 
-    await spanlog.withRequest('7f3a9c', () => repository.reserve());
-
-    expect(written.map(shape)).toEqual([
-      'info InventoryRepository.reserve - run | START',
-      'debug InventoryRepository.reserve - query UPDATE warehouse.inventory | START',
-      'debug InventoryRepository.reserve - query UPDATE warehouse.inventory | DONE Nms',
-      'info InventoryRepository.reserve - run | DONE Nms',
-    ]);
-    expect(written[2]?.fields).toMatchObject({
-      reqId: '7f3a9c',
-      scope: 'InventoryRepository',
-      method: 'reserve',
-      action: 'query',
-      op: 'UPDATE',
-      tables: ['warehouse.inventory'],
-    });
-  });
-
-  it('never writes the statement text', () => {
+  it('hides spanlog frames of an error thrown after an await', async () => {
+    class Inner {
+      async fail(): Promise<void> {
+        await delay(1);
+        throw new Error('after await');
+      }
+    }
     const { spanlog, written } = setup();
-    spanlog.startQuery("SELECT * FROM users WHERE email = 'a@b.c'").end();
-
-    const everything = JSON.stringify(written);
-    expect(everything).not.toContain('a@b.c');
-    expect(everything).not.toContain('WHERE');
-  });
-
-  it('keeps a string literal out of the tables', () => {
-    const { spanlog, written } = setup();
-    spanlog
-      .startQuery("INSERT INTO notes (body) VALUES ('sent from alice_secret')")
-      .end();
-
-    expect(written[0]?.fields.tables).toEqual(['notes']);
-    expect(JSON.stringify(written)).not.toContain('alice_secret');
-  });
-
-  it('never writes the statement text when the statement fails', () => {
-    const { spanlog, written } = setup();
-    spanlog
-      .startQuery("SELECT * FROM users WHERE email = 'a@b.c'")
-      .fail(new Error('boom'));
-
-    const everything = JSON.stringify(written);
-    expect(everything).not.toContain('a@b.c');
-    expect(everything).not.toContain('WHERE');
-  });
-
-  it('writes no frame outside a wrapped method', () => {
-    const { spanlog, written } = setup();
-    spanlog.startQuery('COMMIT').end();
-
-    expect(written.map(shape)).toEqual([
-      'debug query COMMIT | START',
-      'debug query COMMIT | DONE Nms',
-    ]);
-    expect(written[0]?.lines[0]).toContain('req=-');
-  });
-
-  it('ends a ROLLBACK at warn', () => {
-    const { spanlog, written } = setup({ level: 'info' });
-    spanlog.startQuery('ROLLBACK').end();
-
-    expect(written.map(shape)).toEqual(['warn query ROLLBACK | DONE Nms']);
-  });
-
-  it('names the tables an adapter gives a ROLLBACK', () => {
-    const { spanlog, written } = setup();
-    spanlog.startQuery('ROLLBACK', ['orders', 'warehouse.inventory']).end();
-
-    expect(written.map(shape)).toEqual([
-      'debug query ROLLBACK orders, warehouse.inventory | START',
-      'warn query ROLLBACK orders, warehouse.inventory | DONE Nms',
-    ]);
-    expect(written[1]?.fields.tables).toEqual([
-      'orders',
-      'warehouse.inventory',
-    ]);
-  });
-
-  it('keeps the tables of its text for a statement other than ROLLBACK', () => {
-    const { spanlog, written } = setup();
-    spanlog.startQuery('COMMIT', ['orders']).end();
-
-    expect(written.map(shape)).toEqual([
-      'debug query COMMIT | START',
-      'debug query COMMIT | DONE Nms',
-    ]);
-  });
-
-  it('fails at warn without a stack and leaves the error to its frame', async () => {
-    const { spanlog, written } = setup();
-    const failure = new Error('duplicate key value');
-    const repository = spanlog.traced(
-      new InventoryRepository({
-        run: async (sql) => {
-          const span = spanlog.startQuery(sql);
-          span.fail(failure);
-          throw failure;
-        },
-      }),
-      'InventoryRepository',
-    );
+    const inner = spanlog.traced(new Inner(), 'Inner');
 
     await expect(
-      spanlog.withRequest('b81e44', () => repository.reserve()),
-    ).rejects.toBe(failure);
+      spanlog.withRequest('r-10', () => inner.fail()),
+    ).rejects.toThrow('after await');
 
-    expect(written.map(shape)).toEqual([
-      'info InventoryRepository.reserve - run | START',
-      'debug InventoryRepository.reserve - query UPDATE warehouse.inventory | START',
-      'warn InventoryRepository.reserve - query UPDATE warehouse.inventory | FAILED Nms Error: duplicate key value',
-      'error InventoryRepository.reserve - run | FAILED Nms Error: duplicate key value',
-    ]);
-    expect(written[2]?.lines).toHaveLength(1);
-    expect(written[2]?.fields.err).toEqual({
-      name: 'Error',
-      message: 'duplicate key value',
-    });
-    expect(written[3]?.lines.length).toBeGreaterThan(1);
-    expect(written[3]?.fields.err).toHaveProperty('stack');
+    expectOwnFramesHidden(firstReport(written));
   });
 
-  it('writes only the first end line', () => {
+  it('hides spanlog frames of an error thrown before the first await', async () => {
+    class Inner {
+      async fail(): Promise<void> {
+        throw new Error('before await');
+      }
+    }
     const { spanlog, written } = setup();
-    const span = spanlog.startQuery('COMMIT');
-    span.end();
-    span.fail(new Error('late'));
+    const inner = spanlog.traced(new Inner(), 'Inner');
 
-    expect(written).toHaveLength(2);
+    await expect(
+      spanlog.withRequest('r-11', () => inner.fail()),
+    ).rejects.toThrow('before await');
+
+    expectOwnFramesHidden(firstReport(written));
   });
 
-  it('ends with SLOW after slowMs', async () => {
-    const { spanlog, written } = setup({ slowMs: 5 });
-    const span = spanlog.startQuery('SELECT * FROM orders');
-    await delay(15);
-    span.end();
+  it('hides spanlog frames of an error thrown inside an explicit call', async () => {
+    const { spanlog, written } = setup();
 
-    expect(shape(written[1]!)).toBe('warn query SELECT orders | SLOW Nms');
+    await expect(
+      spanlog.withRequest('r-12', () =>
+        spanlog.call('x.y', async () => {
+          throw new Error('in call');
+        }),
+      ),
+    ).rejects.toThrow('in call');
+
+    expectOwnFramesHidden(firstReport(written));
+  });
+
+  it('keeps the frame of an application method named with the spanlog prefix', async () => {
+    class Parser {
+      async spanlogParse(): Promise<void> {
+        throw new Error('bad input');
+      }
+    }
+    const { spanlog, written } = setup();
+    const parser = spanlog.traced(new Parser(), 'Parser');
+
+    await expect(parser.spanlogParse()).rejects.toThrow('bad input');
+
+    const readable = firstReport(written).lines.slice(1);
+    expect(readable.some((l) => l.includes('Parser.spanlogParse'))).toBe(true);
   });
 });
 
@@ -287,7 +279,7 @@ describe('errorMessage option', () => {
   const SECRET = 'private@example.test';
 
   it('writes the message of an Error as it is by default', async () => {
-    const { spanlog, written } = setup();
+    const { spanlog, written } = setupAtDebug();
     const repository = spanlog.traced(
       new Repository(new Error(`bad value ${SECRET}`)),
       'Repository',
@@ -299,7 +291,7 @@ describe('errorMessage option', () => {
   });
 
   it('replaces the message on every line and in the stack', async () => {
-    const { spanlog, written } = setup({
+    const { spanlog, written } = setupAtDebug({
       errorMessage: (error) => `${error.name} hidden`,
     });
     const failure = new Error(
@@ -320,7 +312,7 @@ describe('errorMessage option', () => {
   });
 
   it('keeps the frames when the name changed after the stack was made', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const failure = new Error(`bad value ${SECRET}`);
     expect(failure.stack).toContain('Error: bad value');
     failure.name = 'CustomError';
@@ -334,7 +326,7 @@ describe('errorMessage option', () => {
   });
 
   it('keeps the frames when the name holds a colon and a space', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const failure = new Error(`bad value ${SECRET}`);
     failure.name = 'Outer: Inner';
     const repository = spanlog.traced(new Repository(failure), 'Repository');
@@ -361,7 +353,9 @@ describe('errorMessage option', () => {
   ])(
     'keeps the frames when the name %s',
     async (_label, name, message, firstLine) => {
-      const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+      const { spanlog, written } = setupAtDebug({
+        errorMessage: () => 'hidden',
+      });
       const failure = new Error(message);
       failure.name = name;
       failure.stack = `${firstLine}\n    at a (a.js:1:1)`;
@@ -381,7 +375,9 @@ describe('errorMessage option', () => {
   ])(
     'keeps no frames of a first line that holds neither name nor message when %s',
     async (_label, name, firstLine) => {
-      const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+      const { spanlog, written } = setupAtDebug({
+        errorMessage: () => 'hidden',
+      });
       const failure = new Error('');
       failure.name = name;
       failure.stack = `${firstLine}\n    at ${SECRET} (old.js:1:1)`;
@@ -396,7 +392,7 @@ describe('errorMessage option', () => {
   );
 
   it('drops the old lines when the message changed to its first line', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const failure = new Error(`bad value\ndetail ${SECRET}`);
     expect(failure.stack).toContain(SECRET);
     failure.message = 'bad value';
@@ -409,7 +405,7 @@ describe('errorMessage option', () => {
   });
 
   it('keeps the frames of an Error without a message', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const repository = spanlog.traced(
       new Repository(new Error('')),
       'Repository',
@@ -421,7 +417,7 @@ describe('errorMessage option', () => {
   });
 
   it('reads a stack whose first line is the name alone', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const failure = new Error('');
     failure.stack = 'Error\n    at a (a.js:1:1)';
     const repository = spanlog.traced(new Repository(failure), 'Repository');
@@ -433,7 +429,7 @@ describe('errorMessage option', () => {
   });
 
   it('keeps a frame that holds the text of the message', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const failure = new Error('load');
     failure.stack = 'Error: load\n    at load (a.js:1:1)\n    at b (a.js:2:2)';
     const repository = spanlog.traced(new Repository(failure), 'Repository');
@@ -447,7 +443,7 @@ describe('errorMessage option', () => {
   });
 
   it('keeps the frames when the message changed before the stack was read', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const failure = new Error(`bad value ${SECRET}`);
     failure.message = 'wrapped';
     const repository = spanlog.traced(new Repository(failure), 'Repository');
@@ -466,7 +462,9 @@ describe('errorMessage option', () => {
     ['the tail of the old first line', 'value'],
   ])('when the message changed to %s', (_label, changedMessage) => {
     it('keeps nothing of the old message', async () => {
-      const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+      const { spanlog, written } = setupAtDebug({
+        errorMessage: () => 'hidden',
+      });
       const failure = new Error(`bad: value\n    at ${SECRET} (looks.js:1:1)`);
       expect(failure.stack).toContain(SECRET);
       failure.message = changedMessage;
@@ -483,7 +481,7 @@ describe('errorMessage option', () => {
   });
 
   it('replaces the message of a failed statement', () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     spanlog
       .startQuery('SELECT 1 FROM orders')
       .fail(new Error(`bad value ${SECRET}`));
@@ -496,7 +494,7 @@ describe('errorMessage option', () => {
   });
 
   it('replaces the message of a thrown string, which becomes an Error', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const repository = spanlog.traced(new Repository(SECRET), 'Repository');
 
     await expect(repository.load()).rejects.toThrow(SECRET);
@@ -505,7 +503,7 @@ describe('errorMessage option', () => {
   });
 
   it('hides the message when errorMessage throws', async () => {
-    const { spanlog, written } = setup({
+    const { spanlog, written } = setupAtDebug({
       errorMessage: () => {
         throw new Error('broken');
       },
@@ -523,7 +521,7 @@ describe('errorMessage option', () => {
   });
 
   it('leaves a thrown plain object to redact', async () => {
-    const { spanlog, written } = setup({ errorMessage: () => 'hidden' });
+    const { spanlog, written } = setupAtDebug({ errorMessage: () => 'hidden' });
     const repository = spanlog.traced(
       new Repository({ code: 'E1', password: SECRET }),
       'Repository',

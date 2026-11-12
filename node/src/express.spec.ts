@@ -5,18 +5,8 @@ import express, { type ErrorRequestHandler, type Express } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 import { logRequests } from './express.js';
 import { createSpanlog, type Spanlog } from './spanlog.js';
+import { delay, shapeWithRequest } from './testing/helpers.js';
 import type { Rendered } from './types.js';
-
-const MS = /\d+(\.\d+)?ms/;
-
-function shape(rendered: Rendered): string {
-  const reqId = String(rendered.fields.reqId ?? '-');
-  return `${reqId} ${rendered.level} ${rendered.msg.replace(MS, 'Nms')}`;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 class OrderService {
   async place(sku: string): Promise<string> {
@@ -108,7 +98,7 @@ describe('logRequests', () => {
 
     const reqId = response.headers.get('x-request-id');
     expect(reqId).toMatch(/^[0-9a-f]{8}$/);
-    expect(written.map(shape)).toEqual([
+    expect(written.map(shapeWithRequest)).toEqual([
       `${reqId} info POST /orders/A1 | START`,
       `${reqId} info OrderService.place - run | START`,
       `${reqId} info OrderService.place - run | DONE Nms`,
@@ -152,7 +142,7 @@ describe('logRequests', () => {
 
     expect(response.status).toBe(500);
     const reqId = response.headers.get('x-request-id');
-    expect(written.map(shape)).toEqual([
+    expect(written.map(shapeWithRequest)).toEqual([
       `${reqId} info POST /orders/none | START`,
       `${reqId} info OrderService.place - run | START`,
       `${reqId} error OrderService.place - run | FAILED Nms Error: stock not available`,
@@ -176,7 +166,7 @@ describe('logRequests', () => {
     for (const [index, sku] of ['A1', 'B2', 'C3'].entries()) {
       const reqId = responses[index]?.headers.get('x-request-id');
       const own = written.filter((line) => line.fields.reqId === reqId);
-      expect(own.map(shape)).toEqual([
+      expect(own.map(shapeWithRequest)).toEqual([
         `${reqId} info POST /orders/${sku} | START`,
         `${reqId} info OrderService.place - run | START`,
         `${reqId} info OrderService.place - run | DONE Nms`,
@@ -204,7 +194,7 @@ describe('logRequests', () => {
     client.destroy();
     const aborted = await lineWith('| ABORTED');
 
-    expect(shape(aborted)).toMatch(
+    expect(shapeWithRequest(aborted)).toMatch(
       /^[0-9a-f]{8} warn GET \/stream \| ABORTED Nms$/,
     );
     expect(aborted.fields).not.toHaveProperty('status');
@@ -250,7 +240,9 @@ describe('logRequests', () => {
     await middlewareFinished;
 
     expect(
-      written.map(shape).map((line) => line.split(' ').slice(1).join(' ')),
+      written
+        .map(shapeWithRequest)
+        .map((line) => line.split(' ').slice(1).join(' ')),
     ).toEqual(['info GET /late | START', 'warn GET /late | ABORTED Nms']);
   });
 
