@@ -53,7 +53,8 @@ inside one process. Another process writes its own lines under its own `service`
 | `summary` | object | `DONE` and `SLOW` of an explicit `call`, when a summary is given. Redacted |
 
 The built-in JSON writer adds `time` (ISO 8601, UTC), `level` and `msg`. With pino or slog as the destination, the
-encoding of time, level and message follows that logger.
+encoding of time, level and message follows that logger. A JSON Schema of the line that the built-in JSON writer writes
+is in [`spec/log-line.schema.json`](../spec/log-line.schema.json).
 
 Arguments, return values, SQL text and SQL parameters are not written unless the application passes them as `params`
 or `summary`. The exception is the `message` of an `Error`, which can repeat a value. See [Errors](#errors).
@@ -198,6 +199,7 @@ Go module writes query lines through `Connector` for `database/sql`, and through
 - `op` is the first keyword of the statement in capitals. `START TRANSACTION` keeps both words. For a statement that
   starts with `WITH`, `op` is the keyword after the common table expressions. Parentheses before that keyword are
   skipped, both at the start of the statement and after the expressions.
+- A statement without a keyword, such as one that holds only a comment or white space, has no `op` and no `target`.
 - Keywords compare after folding `a`-`z` to capitals and nothing else, and `op` is capitalized the same way. A letter
   such as `ı` or `ß` stays as it is, even where a Unicode upper-case function would turn it into `I` or `SS`.
 - `tables` lists every name that follows `FROM`, `JOIN`, `INTO` or `UPDATE`, in the order first seen, without

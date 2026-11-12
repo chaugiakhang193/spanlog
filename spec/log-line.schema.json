@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/chaugiakhang193/spanlog/blob/main/spec/log-line.schema.json",
+  "title": "spanlog log line",
+  "description": "One line of the built-in JSON writer (jsonSink in Node.js, JSONSink in Go, json_sink in Python). With pino, slog or logging as the destination, the encoding of time, level and msg follows that logger.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["time", "level", "service", "action", "phase", "msg"],
+  "properties": {
+    "time": {
+      "description": "Time of the event, ISO 8601 in UTC.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "level": {
+      "description": "Level of the line.",
+      "enum": ["debug", "info", "warn", "error"]
+    },
+    "service": {
+      "description": "Name of the application process, given in the configuration.",
+      "type": "string"
+    },
+    "reqId": {
+      "description": "Id of the request the line was written in.",
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "description": "Scope of the frame the line belongs to.",
+      "type": "string",
+      "minLength": 1
+    },
+    "method": {
+      "description": "Method of the frame the line belongs to.",
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "description": "Kind of event.",
+      "enum": ["request", "run", "call", "query"]
+    },
+    "target": {
+      "description": "Method and path of a request, callee of a call, operation and tables of a query. Required on request and call. Absent on a query whose statement has no keyword.",
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "description": "Point in the action that the line describes.",
+      "enum": ["START", "DONE", "SLOW", "FAILED", "ABORTED"]
+    },
+    "ms": {
+      "description": "Duration in milliseconds, rounded to one decimal.",
+      "type": "number"
+    },
+    "status": {
+      "description": "Response status of a request.",
+      "type": "integer"
+    },
+    "op": {
+      "description": "First keyword of the SQL statement in capitals. Absent when the statement has no keyword.",
+      "type": "string",
+      "minLength": 1
+    },
+    "tables": {
+      "description": "Tables named by the SQL statement. On a ROLLBACK, the tables that the rollback undoes.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "err": {
+      "description": "The failure of a FAILED line.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "name": {
+          "description": "Name of the error. Absent when the error has none.",
+          "type": "string"
+        },
+        "message": {
+          "description": "Message of the error.",
+          "type": "string"
+        },
+        "stack": {
+          "description": "Stack of the error, on its first report in the request.",
+          "type": "string"
+        }
+      }
+    },
+    "params": {
+      "description": "Parameters of an explicit call, redacted.",
+      "type": "object"
+    },
+    "summary": {
+      "description": "Summary of the result of an explicit call, redacted.",
+      "type": "object"
+    },
+    "msg": {
+      "description": "Message of the line.",
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "phase": { "const": "START" } } },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["ms"] },
+            { "required": ["status"] },
+            { "required": ["err"] },
+            { "required": ["summary"] }
+          ]
+        }
+      },
+      "else": { "required": ["ms"] }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": { "const": "request" },
+          "phase": { "enum": ["DONE", "SLOW", "FAILED"] }
+        }
+      },
+      "then": { "required": ["status"] }
+    },
+    {
+      "if": { "properties": { "action": { "const": "request" } } },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["scope"] },
+            { "required": ["method"] },
+            { "required": ["op"] },
+            { "required": ["tables"] },
+            { "required": ["err"] },
+            { "required": ["params"] },
+            { "required": ["summary"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": { "properties": { "action": { "const": "run" } } },
+      "then": { "not": { "required": ["target"] } }
+    },
+    {
+      "if": { "properties": { "action": { "enum": ["request", "call"] } } },
+      "then": { "required": ["target"] }
+    },
+    {
+      "if": { "properties": { "action": { "const": "query" } } },
+      "then": { "required": ["tables"] },
+      "else": {
+        "not": {
+          "anyOf": [{ "required": ["op"] }, { "required": ["tables"] }]
+        }
+      }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "ABORTED" } } },
+      "then": {
+        "properties": { "action": { "const": "request" } },
+        "not": { "required": ["status"] }
+      }
+    }
+  ]
+}

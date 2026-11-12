@@ -55,6 +55,7 @@
   "devDependencies": {
     "@types/express": "5.0.6",
     "@types/node": "24.19.2",
+    "ajv": "8.20.0",
     "express": "5.3.0",
     "pg": "8.23.1",
     "prettier": "3.9.10",
