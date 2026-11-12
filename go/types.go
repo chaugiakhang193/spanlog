@@ -1,6 +1,3 @@
-// Package spanlog writes readable call-boundary logs: one line when a call
-// starts and one line when it ends, with its duration. The line format follows
-// docs/log-format.md and is shared with the Node.js package.
 package spanlog
 
 import "time"
