@@ -83,6 +83,9 @@ def _body_of(event: SpanEvent) -> str:
         return "run"
     if event.action == "request":
         return target
+    if event.action == "query" and not target:
+        # A statement without a keyword has no target, and the body is the action alone.
+        return "query"
     return f"{event.action} {target}"
 
 

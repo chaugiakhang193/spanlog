@@ -516,6 +516,66 @@
       }
     },
     {
+      "name": "query without a keyword shows the action alone",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "action": "query",
+        "tables": [],
+        "phase": "START"
+      },
+      "expect": {
+        "level": "debug",
+        "msg": "query | START",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "action": "query",
+          "phase": "START",
+          "tables": []
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 DEBUG [shop] req=7f3a9c query | START"
+        ]
+      }
+    },
+    {
+      "name": "query with an empty target and op shows the action alone",
+      "options": { "utcOffsetMinutes": 420 },
+      "event": {
+        "time": "2026-10-24T14:15:03.120Z",
+        "service": "shop",
+        "reqId": "7f3a9c",
+        "scope": "OrderService",
+        "method": "handleOrder",
+        "action": "query",
+        "target": "",
+        "op": "",
+        "tables": [],
+        "phase": "DONE",
+        "durationMs": 2
+      },
+      "expect": {
+        "level": "debug",
+        "msg": "OrderService.handleOrder - query | DONE 2ms",
+        "fields": {
+          "service": "shop",
+          "reqId": "7f3a9c",
+          "scope": "OrderService",
+          "method": "handleOrder",
+          "action": "query",
+          "phase": "DONE",
+          "ms": 2,
+          "tables": []
+        },
+        "lines": [
+          "2026-10-24 21:15:03.120 +07:00 DEBUG [shop] [OrderService.handleOrder] req=7f3a9c query | DONE 2ms"
+        ]
+      }
+    },
+    {
       "name": "request failed with a 5xx status",
       "options": { "utcOffsetMinutes": 420 },
       "event": {

@@ -99,6 +99,11 @@ func bodyOf(event Event) string {
 	case ActionCall:
 		return "call " + event.Target
 	case ActionQuery:
+		// A statement without a keyword has no target, and the body is the
+		// action alone.
+		if event.Target == "" {
+			return "query"
+		}
 		return "query " + event.Target
 	default:
 		return event.Target

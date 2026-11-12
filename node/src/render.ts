@@ -93,7 +93,9 @@ function bodyOf(event: SpanEvent): string {
     case 'call':
       return `call ${target}`;
     case 'query':
-      return `query ${target}`;
+      // A statement without a keyword has no target, and the body is the
+      // action alone.
+      return target === '' ? 'query' : `query ${target}`;
   }
 }
 

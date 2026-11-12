@@ -82,7 +82,7 @@ The default minimum level is info. Query lines and calls within one scope appear
 | `request` | `{target}` |
 | `run` | `run` |
 | `call` | `call {target}` |
-| `query` | `query {target}` |
+| `query` | `query {target}`, or `query` alone when there is no target |
 
 Detail:
 
@@ -200,6 +200,7 @@ Go module writes query lines through `Connector` for `database/sql`, and through
   starts with `WITH`, `op` is the keyword after the common table expressions. Parentheses before that keyword are
   skipped, both at the start of the statement and after the expressions.
 - A statement without a keyword, such as one that holds only a comment or white space, has no `op` and no `target`.
+  Its lines read `query | START` and `query | DONE {ms}ms`.
 - Keywords compare after folding `a`-`z` to capitals and nothing else, and `op` is capitalized the same way. A letter
   such as `ı` or `ß` stays as it is, even where a Unicode upper-case function would turn it into `I` or `SS`.
 - `tables` lists every name that follows `FROM`, `JOIN`, `INTO` or `UPDATE`, in the order first seen, without
