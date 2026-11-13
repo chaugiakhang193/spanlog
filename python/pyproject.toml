@@ -4,12 +4,25 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spanlog"
-version = "0.0.0"
+version = "0.1.0"
 description = "Readable call-boundary logs: one line when a call starts, one when it ends."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
+authors = [{ name = "chaugiakhang193" }]
+keywords = ["logging", "asgi", "wsgi", "sqlalchemy", "fastapi", "flask", "request-id"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Typing :: Typed",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/chaugiakhang193/spanlog"
+Documentation = "https://github.com/chaugiakhang193/spanlog/blob/main/docs/python.md"
+Changelog = "https://github.com/chaugiakhang193/spanlog/blob/main/docs/CHANGELOG.md"
+Issues = "https://github.com/chaugiakhang193/spanlog/issues"
 
 [project.optional-dependencies]
 sqlalchemy = ["sqlalchemy>=2.0,<3"]

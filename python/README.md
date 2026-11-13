@@ -21,12 +21,11 @@ without the lines of one internal call. Stack paths are shortened.
 
 ## Install
 
-The package has no release. Install it from a clone:
-
 ```bash
-git clone https://github.com/chaugiakhang193/spanlog.git
-pip install ./spanlog/python
+pip install spanlog
 ```
+
+Query lines for SQLAlchemy need the extra: `pip install "spanlog[sqlalchemy]"`.
 
 ## Quick start
 
@@ -63,4 +62,4 @@ Flask has the same two lines through `spanlog.wsgi`.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/chaugiakhang193/spanlog/blob/main/python/LICENSE)

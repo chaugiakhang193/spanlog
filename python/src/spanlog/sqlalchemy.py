@@ -7,9 +7,19 @@ import weakref
 from collections.abc import Callable
 from typing import Any
 
-from sqlalchemy import event
-from sqlalchemy.engine import Connection, Engine, ExceptionContext
-from sqlalchemy.engine.interfaces import DBAPICursor, Dialect, ExecutionContext
+try:
+    from sqlalchemy import event
+    from sqlalchemy.engine import Connection, Engine, ExceptionContext
+    from sqlalchemy.engine.interfaces import DBAPICursor, Dialect, ExecutionContext
+except ModuleNotFoundError as error:
+    # SQLAlchemy is the optional extra of this module.
+    # Errors from other missing modules pass unchanged.
+    if error.name != "sqlalchemy":
+        raise
+    raise ModuleNotFoundError(
+        'spanlog.sqlalchemy needs SQLAlchemy. Install it with: pip install "spanlog[sqlalchemy]"',
+        name="sqlalchemy",
+    ) from error
 
 from ._core import QuerySpan, Spanlog
 from ._transaction_tables import TransactionTables, ends_transaction

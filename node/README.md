@@ -22,13 +22,8 @@ without the lines of one internal call. The stack is cut to its first two frames
 
 ## Install
 
-The package has no release. Build it from a clone:
-
 ```bash
-git clone https://github.com/chaugiakhang193/spanlog.git
-npm --prefix spanlog/node ci
-npm --prefix spanlog/node run build
-npm install ./spanlog/node
+npm install spanlog
 ```
 
 ## Quick start
@@ -63,4 +58,4 @@ app.listen(3020, '127.0.0.1');
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/chaugiakhang193/spanlog/blob/main/node/LICENSE)

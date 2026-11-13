@@ -1,11 +1,9 @@
 # Python guide
 
-Requires Python 3.11 or newer. The package has no dependency outside the standard library. The package is not on PyPI, so
-install it from a clone:
+Requires Python 3.11 or newer. The package has no dependency outside the standard library.
 
 ```bash
-git clone https://github.com/chaugiakhang193/spanlog.git
-pip install ./spanlog/python
+pip install spanlog
 ```
 
 ## Quick start with FastAPI
@@ -123,7 +121,7 @@ carry it. `threading.Thread` and `ThreadPoolExecutor.submit` start with an empty
 
 ## Database queries
 
-`pip install "./spanlog/python[sqlalchemy]"`, then call `log_queries` once per engine:
+`pip install "spanlog[sqlalchemy]"`, then call `log_queries` once per engine:
 
 ```python
 from spanlog.sqlalchemy import log_queries
@@ -136,6 +134,8 @@ log_queries(engine, log)
 the operation and the table names, in the frame that runs it. A slow or failed statement appears at warn. The SQL text
 and its parameters stay out. `log_queries` returns a function that removes the listeners. Calling it twice on one engine
 writes every line twice.
+
+Without SQLAlchemy, importing `spanlog.sqlalchemy` raises `ModuleNotFoundError` with the install command.
 
 A full example is in [`examples/fastapi-orders`](../examples/fastapi-orders/server.py).
 

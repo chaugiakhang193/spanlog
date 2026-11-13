@@ -1,4 +1,6 @@
+import importlib
 import json
+import sys
 import threading
 from types import SimpleNamespace
 
@@ -424,3 +426,10 @@ def test_detach_in_any_order_gives_the_dialect_its_own_do_rollback(engine, order
 
 def test_a_dialect_that_cannot_detect_autocommit_is_taken_as_not_in_autocommit():
     assert _autocommits(SimpleNamespace(), object()) is False
+
+
+def test_import_without_sqlalchemy_names_the_extra(monkeypatch):
+    monkeypatch.setitem(sys.modules, "sqlalchemy", None)
+    monkeypatch.delitem(sys.modules, "spanlog.sqlalchemy")
+    with pytest.raises(ModuleNotFoundError, match=r'pip install "spanlog\[sqlalchemy\]"'):
+        importlib.import_module("spanlog.sqlalchemy")

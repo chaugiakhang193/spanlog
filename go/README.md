@@ -20,18 +20,8 @@ of one internal call. The stack is cut to its first two frames and its paths are
 
 ## Install
 
-The module has no release. Build it from a clone:
-
 ```bash
-git clone https://github.com/chaugiakhang193/spanlog.git
-```
-
-Then, in your `go.mod`:
-
-```
-require github.com/chaugiakhang193/spanlog/go v0.0.0
-
-replace github.com/chaugiakhang193/spanlog/go => ./spanlog/go
+go get github.com/chaugiakhang193/spanlog/go
 ```
 
 ```go
@@ -86,4 +76,4 @@ func main() {
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/chaugiakhang193/spanlog/blob/main/go/LICENSE)

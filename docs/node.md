@@ -3,6 +3,10 @@
 Requires Node.js 22.13 or newer. The package is ESM. Express and TypeORM are optional peer dependencies, needed only by
 `spanlog/express` and `spanlog/typeorm`.
 
+```bash
+npm install spanlog
+```
+
 ## Quick start with Express
 
 ```js

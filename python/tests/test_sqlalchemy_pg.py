@@ -53,11 +53,15 @@ def assert_statement_error_is_clean(recording):
     written = "".join(recording.written)
     assert SECRET not in written
     assert "VALUES" not in written
-    failed = [line for line in recording.lines if line["phase"] == "FAILED"]
-    assert failed
-    assert [(line["err"]["name"], line["err"]["message"]) for line in failed] == [
-        ("IntegrityError", UNIQUE_MESSAGE)
-    ] * len(failed)
+    failed = [
+        (line["action"], line.get("target"), line["err"]["name"], line["err"]["message"])
+        for line in recording.lines
+        if line["phase"] == "FAILED"
+    ]
+    assert failed == [
+        ("query", "INSERT pg_people", "IntegrityError", UNIQUE_MESSAGE),
+        ("run", None, "IntegrityError", UNIQUE_MESSAGE),
+    ]
 
 
 def in_async_tables(body):

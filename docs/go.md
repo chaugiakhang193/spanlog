@@ -2,6 +2,10 @@
 
 Requires Go 1.26. The package has no dependency outside the standard library.
 
+```bash
+go get github.com/chaugiakhang193/spanlog/go
+```
+
 ```go
 import "github.com/chaugiakhang193/spanlog/go"
 ```

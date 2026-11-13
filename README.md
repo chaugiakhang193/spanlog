@@ -25,27 +25,20 @@ already uses. There is no collector, dashboard or account to set up.
 
 ## Install
 
-The package and the module have no release. Build from a clone:
+```bash
+npm install spanlog
+```
+
+For Go:
 
 ```bash
-git clone https://github.com/chaugiakhang193/spanlog.git
-npm --prefix spanlog/node ci
-npm --prefix spanlog/node run build
-npm install ./spanlog/node
-```
-
-For Go, in your `go.mod`:
-
-```
-require github.com/chaugiakhang193/spanlog/go v0.0.0
-
-replace github.com/chaugiakhang193/spanlog/go => ./spanlog/go
+go get github.com/chaugiakhang193/spanlog/go
 ```
 
 For Python:
 
 ```bash
-pip install ./spanlog/python
+pip install spanlog
 ```
 
 ## Use
@@ -123,7 +116,8 @@ own logger are what you want.
 
 ## Status
 
-Early development. Fields and options can change before 1.0.
+Early development. Fields and options can change before 1.0. Each release is listed in
+[docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## License
 

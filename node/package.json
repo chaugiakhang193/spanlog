@@ -1,8 +1,15 @@
 {
   "name": "spanlog",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Readable call-boundary logs for Node.js: START and DONE lines with timing, written to the application's own logger",
+  "keywords": [
+    "logging",
+    "express",
+    "typeorm",
+    "request-id"
+  ],
+  "homepage": "https://github.com/chaugiakhang193/spanlog/tree/main/node#readme",
+  "bugs": "https://github.com/chaugiakhang193/spanlog/issues",
   "license": "MIT",
   "author": "chaugiakhang193",
   "repository": {
@@ -34,6 +41,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:pg": "vitest run --config vitest.pg.config.ts",
