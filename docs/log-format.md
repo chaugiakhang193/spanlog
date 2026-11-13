@@ -109,8 +109,10 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
 - ` [{frame}]` is left out when the line belongs to no frame.
 - `{reqId}` is `-` outside a request.
 - On the first report of an error that has a stack, the lines of the stack after its first line follow the main line,
-  each trimmed and indented by 4 spaces. Frames of spanlog's own functions are left out of these lines. `err.stack`
-  in the fields keeps every frame.
+  each trimmed and indented by 4 spaces. Frames of spanlog's own functions are left out of these lines, and so are an
+  `AsyncLocalStorage.run` frame called by spanlog in Node.js and the `runtime.gopanic` and `runtime.goexit` frames in
+  Go. Other frames stay, including those of other libraries, such as an ORM or `net/http`. `err.stack` in the fields
+  keeps every frame.
 
 ## Errors
 
@@ -129,6 +131,8 @@ The readable line moves the frame into its own brackets. `msg` keeps it in front
 - `message` is written as the `Error` carries it. A database error can repeat a parameter value, as Postgres does in
   `invalid input syntax for type integer: "..."`. The `errorMessage` option replaces the message of every `Error` on
   the lines and in `err.stack`. When that function throws, the description of an unreadable value stands in.
+- In Node.js, `err.stack` is the `stack` of the `Error`. V8 records at most `Error.stackTraceLimit` frames in it, 10 by
+  default.
 - With `errorMessage` in Node.js, the stack keeps its frames when its start holds the current message in one of these
   forms: `{name}: {message}`, `{other name}: {message}` where the other name has no `: ` (`err.name` was assigned after
   the stack was written), `{name}` alone when the message is empty, `{message}` alone when the name is empty. Any other

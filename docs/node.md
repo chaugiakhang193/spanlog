@@ -78,6 +78,11 @@ no query events for them. A `ROLLBACK` names the tables written in its transacti
 [Query lines](log-format.md#query-lines). Each `QueryRunner` is followed on its own, so two transactions that run at once
 keep their tables apart.
 
+The `START` and `DONE` lines of a statement are at debug level and appear with `level: 'debug'`. A slow or failed
+statement writes at warn, and so does the `DONE` line of a `ROLLBACK`. The line of a failed statement carries the
+error of the driver, whose `name` is `error` with `pg`. The frame that receives the error reports the
+`QueryFailedError` of TypeORM, with its stack.
+
 ## Sinks
 
 - `prettySink(writeText)` writes the readable lines, to stdout by default.

@@ -54,7 +54,7 @@ A full example is in [`examples/go-http`](../examples/go-http/main.go).
 |---|---|---|
 | `Service` | empty | Name written on every line |
 | `Sink` | `PrettySink(os.Stdout)` | Destination of the lines |
-| `Level` | `LevelInfo` | Lowest level written. Calls within one scope appear at `LevelDebug` |
+| `Level` | `LevelInfo` | Lowest level written. Query lines and calls within one scope appear at `LevelDebug` |
 | `SlowMs` | `DefaultSlowMs` (500) | Calls longer than this end with `SLOW` |
 | `UTCOffsetMinutes` | offset of the host | UTC offset of the readable line |
 | `RedactKeys` | none | Keys masked on top of `DefaultRedactKeys` |
@@ -63,7 +63,8 @@ A full example is in [`examples/go-http`](../examples/go-http/main.go).
 
 ## `Start`
 
-`Start` needs a named error result and `defer done(&err)`, written directly. `recover` sees a panic only from the
+`Start` needs a named error result and `defer done(&err)`, written directly. Go requires a name on every result once
+one has a name, so a function with another result reads `(id int64, err error)`. `recover` sees a panic only from the
 deferred function itself, so inside a closure a call that panicked would end with `DONE`.
 
 Pass the returned context to the calls inside. A call that receives the outer context is written as if it were not
@@ -87,9 +88,10 @@ err := logger.Call(ctx, "PriceClient.Fetch", func(ctx context.Context) error {
 
 ## Requests
 
-`logger.Middleware(next, spanlog.MiddlewareOptions{Header: "X-Request-Id"})` runs each request inside `WithRequest` and
-sets the id on the response. An incoming id made of letters, digits, dot, underscore and hyphen, at most 64 characters,
-is kept. Otherwise a new id is generated. `spanlog.RequestID(ctx)` returns it.
+`logger.Middleware(next)` runs each request inside `WithRequest` and sets the id on the response under `X-Request-Id`.
+`logger.Middleware(next, spanlog.MiddlewareOptions{Header: "X-Correlation-Id"})` uses another header. An incoming id
+made of letters, digits, dot, underscore and hyphen, at most 64 characters, is kept. Otherwise a new id is generated.
+`spanlog.RequestID(ctx)` returns it.
 
 Outside HTTP, `spanlog.WithRequest(ctx, jobID)` gives every line under that context the same id.
 
@@ -103,6 +105,9 @@ Outside HTTP, `spanlog.WithRequest(ctx, jobID)` gives every line under that cont
 A driver without its own connector gives one through `driver.DriverContext`:
 `sql.Open` once, then `db.Driver().(driver.DriverContext).OpenConnector(dsn)`. For a driver with neither, a
 `driver.Connector` whose `Connect` returns `Open(dsn)` of the driver does the same.
+
+The `START` and `DONE` lines of a statement are at debug level and appear with `Level: spanlog.LevelDebug`. A slow or
+failed statement writes at warn, and so does the `DONE` line of a `ROLLBACK`.
 
 - A statement writes its pair around the call to the driver. A query ends when its rows are closed, which
   `database/sql` does after the last row, on an error and on `Rows.Close`. Rows left open keep the query without an end

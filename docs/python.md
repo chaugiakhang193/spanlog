@@ -64,7 +64,7 @@ def create_order(sku: str) -> dict[str, str]:
 |---|---|---|
 | `service` | required | Name written on every line |
 | `sink` | `pretty_sink()` | Destination of the lines |
-| `level` | `"info"` | Lowest level written. Calls within one scope appear at `"debug"` |
+| `level` | `"info"` | Lowest level written. Query lines and calls within one scope appear at `"debug"` |
 | `slow_ms` | `DEFAULT_SLOW_MS` (500) | Calls longer than this end with `SLOW` |
 | `utc_offset_minutes` | offset of the host | UTC offset of the readable line |
 | `redact_keys` | none | Keys masked on top of `DEFAULT_REDACT_KEYS` |
@@ -167,8 +167,6 @@ that reason.
   connection, the rollback of that second connection reaches `do_rollback` first on the same thread, and the rollback
   that undoes the writes writes no pair.
 - An ORM insert that SQLAlchemy splits into batches writes one pair of lines per batch. `executemany` writes one pair.
-- The asyncpg dialect of SQLAlchemy puts the class of the driver error in front of its message, so the line reads
-  `IntegrityError: <class 'asyncpg.exceptions.UniqueViolationError'>: duplicate key ...`.
 - `log_queries` uses `event.remove` to detach, which SQLAlchemy does not allow while a statement of that engine is running.
   A statement running at that moment keeps its START line without an end line.
 - ASGI: the middleware sees a client that left when the application reads a disconnect or when one is waiting right before

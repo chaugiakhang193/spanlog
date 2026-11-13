@@ -54,11 +54,10 @@ def assert_statement_error_is_clean(recording):
     assert SECRET not in written
     assert "VALUES" not in written
     failed = [line for line in recording.lines if line["phase"] == "FAILED"]
+    assert failed
     assert [(line["err"]["name"], line["err"]["message"]) for line in failed] == [
-        ("IntegrityError", failed[0]["err"]["message"])
+        ("IntegrityError", UNIQUE_MESSAGE)
     ] * len(failed)
-    assert UNIQUE_MESSAGE in failed[0]["err"]["message"]
-    assert "\n" not in failed[0]["err"]["message"]
 
 
 def in_async_tables(body):
