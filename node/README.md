@@ -1,7 +1,7 @@
 # spanlog for Node.js
 
-spanlog writes one line when a call starts and one line when it ends, with its duration, into the logger the application
-already uses.
+spanlog writes one line when a call starts and one line when it ends, with its duration. The lines go to stdout as
+readable text or JSON, or into a pino logger the application already uses.
 
 ```text
 2026-11-12 21:04:32.897 +07:00 INFO  [shop] req=4abd9c49 POST /orders | START
@@ -49,6 +49,17 @@ app.post('/orders', async (_req, res) => {
 });
 app.listen(3020, '127.0.0.1');
 ```
+
+## Keep your logger
+
+```js
+import pino from 'pino';
+import { createSpanlog, pinoSink } from 'spanlog';
+
+const log = createSpanlog({ service: 'shop', sink: pinoSink(pino()) });
+```
+
+The level of the pino logger filters the lines too. Query lines are at `debug`.
 
 ## Documentation
 

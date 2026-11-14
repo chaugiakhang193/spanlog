@@ -1,7 +1,7 @@
 # spanlog for Python
 
-spanlog writes one line when a call starts and one line when it ends, with its duration, into the logger the application
-already uses.
+spanlog writes one line when a call starts and one line when it ends, with its duration. The lines go to stdout as
+readable text or JSON, or into a `logging.Logger` the application already uses.
 
 ```text
 2026-11-12 21:04:44.830 +07:00 INFO  [shop] req=e5e0891a POST /orders | START
@@ -53,6 +53,20 @@ async def create_order(sku: str) -> dict[str, str]:
 ```
 
 Flask has the same two lines through `spanlog.wsgi`.
+
+## Keep your logger
+
+```python
+import logging
+
+from spanlog import Spanlog, logging_sink
+
+logging.basicConfig(level=logging.INFO)
+log = Spanlog(service="shop", sink=logging_sink(logging.getLogger("shop")))
+```
+
+The level of the `logging.Logger` filters the lines too. Without a level set, `logging` keeps `WARNING` and drops
+`START` and `DONE`.
 
 ## Documentation
 

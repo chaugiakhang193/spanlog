@@ -1,3 +1,4 @@
+import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { jsonSink, pinoSink, prettySink } from './sinks.js';
 import type { Rendered } from './types.js';
@@ -8,6 +9,11 @@ const RENDERED: Rendered = {
   msg: 'send | FAILED 2ms Error: x',
   fields: { service: 'shop', phase: 'FAILED', ms: 2, params: { id: 7n } },
   lines: ['main line', '    at a'],
+};
+
+const PLAIN: Rendered = {
+  ...RENDERED,
+  fields: { ...RENDERED.fields, params: { id: '7' } },
 };
 
 describe('prettySink', () => {
@@ -48,5 +54,25 @@ describe('pinoSink', () => {
 
     expect(logger.error).toHaveBeenCalledWith(RENDERED.fields, RENDERED.msg);
     expect(logger.info).not.toHaveBeenCalled();
+  });
+
+  it('writes through a real pino logger', () => {
+    const written: string[] = [];
+    const logger = pino(
+      { level: 'debug' },
+      { write: (chunk: string) => written.push(chunk) },
+    );
+
+    pinoSink(logger).write(PLAIN);
+
+    expect(written).toHaveLength(1);
+    expect(JSON.parse(written[0]!)).toMatchObject({
+      level: 50,
+      service: 'shop',
+      phase: 'FAILED',
+      ms: 2,
+      params: { id: '7' },
+      msg: 'send | FAILED 2ms Error: x',
+    });
   });
 });

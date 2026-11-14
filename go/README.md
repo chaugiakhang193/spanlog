@@ -1,7 +1,7 @@
 # spanlog for Go
 
-spanlog writes one line when a call starts and one line when it ends, with its duration, into the logger the application
-already uses.
+spanlog writes one line when a call starts and one line when it ends, with its duration. The lines go to an
+`io.Writer` as readable text or JSON, or into a `*slog.Logger` the application already uses.
 
 ```text
 2026-11-12 21:04:38.163 +07:00 INFO  [shop] req=b1965b3d POST /orders | START
@@ -67,6 +67,17 @@ func main() {
 	log.Fatal(http.ListenAndServe("127.0.0.1:3021", logger.Middleware(mux)))
 }
 ```
+
+## Keep your logger
+
+```go
+logger := spanlog.New(spanlog.Options{
+	Service: "shop",
+	Sink:    spanlog.SlogSink(slog.Default()),
+})
+```
+
+The handler of the `*slog.Logger` filters the lines too. Query lines are at `LevelDebug`.
 
 ## Documentation
 

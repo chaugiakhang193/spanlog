@@ -91,8 +91,10 @@ error of the driver, whose `name` is `error` with `pg`. The frame that receives 
 
 - `prettySink(writeText)` writes the readable lines, to stdout by default.
 - `jsonSink(writeText)` writes one JSON object per line, to stdout by default.
-- `pinoSink(logger)` hands fields and message to a pino logger. Its tests use a stand-in with the same methods.
+- `pinoSink(logger)` hands fields and message to a pino logger.
 - A `SpanSink` is any object with `write(rendered)`.
+- With `pinoSink`, the level of the pino logger filters too. pino writes `info` and above by default, so query lines
+  need `level: 'debug'` on both spanlog and pino.
 
 ## What stays out of the logs
 
@@ -123,5 +125,5 @@ spanlog never fails the call it describes. Its own problems reach `process.emitW
 
 ## Tested versions
 
-Node.js 24.18.0, Express 5.3.0, TypeORM 1.1.2, pg 8.23.1, PostgreSQL 18.6. The peer ranges `express ^5.0.0` and
-`typeorm ^1.1.0` are wider than what has been run. Node.js 22, other TypeORM drivers and real pino have not been run.
+Node.js 24.18.0, Express 5.3.0, TypeORM 1.1.2, pg 8.23.1, pino 10.4.0, PostgreSQL 18.6. The peer ranges `express ^5.0.0`
+and `typeorm ^1.1.0` are wider than what has been run. Node.js 22 and other TypeORM drivers have not been run.

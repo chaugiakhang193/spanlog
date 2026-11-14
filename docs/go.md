@@ -145,6 +145,8 @@ writes it with its stack. The statement is read for its operation and tables, an
 - `JSONSink(w)` writes one JSON object per line.
 - `SlogSink(logger)` hands fields and message to a `*slog.Logger`.
 - A `Sink` is any type with `Write(Rendered) error`.
+- With `SlogSink`, the handler of the `*slog.Logger` filters too. The default handlers write Info and above, so query
+  lines need `LevelDebug` on both spanlog and the handler.
 
 ## What stays out of the logs
 

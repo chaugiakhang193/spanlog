@@ -118,6 +118,8 @@ carry it. `threading.Thread` and `ThreadPoolExecutor.submit` start with an empty
 - `json_sink()` writes one JSON object per line.
 - `logging_sink(logger)` hands the message to a `logging.Logger`, with the fields as attributes of the record.
 - A sink is any object with `write(rendered)`.
+- With `logging_sink`, the level of the `logging.Logger` filters too. An application that sets no level keeps the
+  default `WARNING`, which drops `START` and `DONE`. Set it, for example with `logging.basicConfig(level=logging.INFO)`.
 
 ## Database queries
 

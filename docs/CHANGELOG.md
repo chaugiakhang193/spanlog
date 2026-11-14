@@ -4,6 +4,17 @@ spanlog follows [Semantic Versioning](https://semver.org). Before 1.0, a minor v
 functions. The npm package, the Go module and the PyPI package share one version number and the log format of
 [log-format.md](log-format.md).
 
+## Unreleased
+
+### Docs
+
+- The README of each package shows how to keep pino, slog or `logging` as the logger, and that its level filters the
+  lines too.
+
+### Tests
+
+- `pinoSink` is tested against pino 10.4.0.
+
 ## 0.1.0 - 2026-11-14
 
 First release.

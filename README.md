@@ -20,8 +20,9 @@ Readable call-boundary logs for Node.js, Go and Python.
 This is one request from [`examples/express-orders`](examples/express-orders/server.js), without the lines of one
 internal call. Stack paths are shortened.
 
-spanlog writes one line when a call starts and one line when it ends, with its duration, into the logger the application
-already uses. There is no collector, dashboard or account to set up.
+spanlog writes one line when a call starts and one line when it ends, with its duration. The lines go to stdout as
+readable text or JSON, or into the logger the application already uses: pino, slog or `logging`. There is no
+collector, dashboard or account to set up.
 
 ## Install
 
@@ -70,6 +71,20 @@ FastAPI, once per application and once per service. Flask has the same two lines
 log = Spanlog(service="shop")
 orders = log.traced(OrderService(), "OrderService")
 app.add_middleware(LogRequests, log=log)
+```
+
+To keep the logger you already have, pass it as the sink. Its own level filters the lines too:
+
+```js
+const log = createSpanlog({ service: 'shop', sink: pinoSink(pino()) });
+```
+
+```go
+logger := spanlog.New(spanlog.Options{Service: "shop", Sink: spanlog.SlogSink(slog.Default())})
+```
+
+```python
+log = Spanlog(service="shop", sink=logging_sink(logging.getLogger("shop")))
 ```
 
 - [Node.js guide](docs/node.md)
